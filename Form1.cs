@@ -102,11 +102,15 @@ namespace TestApp
                 Log("Starting..");
                 DoApplyPatch(inputPath, outputPath, patchData);
                 Log("Finished.");
-
-                // hmm 
-                ApplyPatchButton.Enabled = true;
-                OutputFileButton.Enabled = true;
-                SelectFolderButton.Enabled = true;
+                
+                // run on main thread 
+                this.Invoke(new Action(() =>
+                {
+                    ApplyPatchButton.Enabled = true;
+                    OutputFileButton.Enabled = true;
+                    SelectFolderButton.Enabled = true;
+                    PatchProgressBar.Value = PatchProgressBar.Maximum; 
+                }));
             });
 
             thread.Start();
@@ -212,6 +216,7 @@ namespace TestApp
                 var totalBytes = reader.Length;
                 buffer = new byte[totalBytes];
 
+                var max_string_size = searchTerm.Length;
                 var read_per = (int)Math.Min(totalBytes, 1024);
                 for (var b = 0; b < totalBytes - read_per; b += read_per)
                 {
@@ -249,16 +254,15 @@ namespace TestApp
 
             if (found)
             {
-                // using (var writer = File.OpenWrite(file))
-                // {
-                //     var totalBytes = buffer.Length;
-                //     var write_per = (int)Math.Min(totalBytes, 1024);
-                //     for(var b = 0; b < totalBytes - write_per; b += write_per)
-                //     {
-                //         writer.Write(buffer, b, write_per);
-                //         PatchProgressBar.Value = (int)((float)(b / totalBytes) * 100 / 2);
-                //     }
-                // }
+                using (var writer = File.OpenWrite(file))
+                {
+                    var totalBytes = buffer.Length;
+                    var write_per = (int)Math.Min(totalBytes, 1024);
+                    for(var b = 0; b < totalBytes - write_per; b += write_per)
+                    {
+                        writer.Write(buffer, b, write_per);
+                    }
+                }
 
                 var encoding = Encoding.GetEncoding("shift_jis");
                 var searchTermString = encoding.GetString(searchTerm);
