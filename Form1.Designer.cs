@@ -159,7 +159,7 @@
             this.Controls.Add(this.PatchProgressBar);
             this.Controls.Add(this.SelectFolderButton);
             this.Name = "Form1";
-            this.Text = "Form1";
+            this.Text = "ISO Translation Patcher";
             this.Load += new System.EventHandler(this.Form1_Load);
             this.ResumeLayout(false);
             this.PerformLayout();
