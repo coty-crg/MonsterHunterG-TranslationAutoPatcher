@@ -87,14 +87,26 @@ namespace TestApp
             var outputPath = OutputFileText.Text;
             var patchData = PatchFileData.Text;
 
+            // skip first line, its the header info 
+            PatchProgressBar.Minimum = 0;
+            PatchProgressBar.Maximum = patchData.Split('\n').Length;
+
+            OutputFileButton.Enabled = false;
+            SelectFolderButton.Enabled = false; 
             ApplyPatchButton.Enabled = false;
-            
+
+            PatchProgressBar.Value = 0; 
+
             var thread = new System.Threading.Thread(() =>
             {
                 Log("Starting..");
                 DoApplyPatch(inputPath, outputPath, patchData);
-                ApplyPatchButton.Enabled = true;
                 Log("Finished.");
+
+                // hmm 
+                ApplyPatchButton.Enabled = true;
+                OutputFileButton.Enabled = true;
+                SelectFolderButton.Enabled = true;
             });
 
             thread.Start();
@@ -113,13 +125,12 @@ namespace TestApp
         
         private void DoApplyPatch(string inputFolder, string outputFile, string patchData)
         {
-            PatchProgressBar.Minimum = 0;
-            PatchProgressBar.Maximum = 100;
-
             // skip first line, its the header info 
             var patches = patchData.Split('\n');
             for(var p = 1; p < patches.Length; ++p) 
             {
+                UpdateProress(1);
+
                 var patch = patches[p];
                 var data = patch.Split(',');
 
@@ -180,86 +191,83 @@ namespace TestApp
             var files = Directory.GetFiles(path);
             foreach (var file in files)
             {
-                byte[] buffer = null;
-                var replaced_count = 0;
-
-                using (var reader = File.OpenRead(file))
+                if(PatchFile(file, searchTerm, patch))
                 {
-                    var totalBytes = reader.Length;
-                    buffer = new byte[totalBytes];
-
-                    var read_per = (int)Math.Min(totalBytes, 1024);
-                    for (var b = 0; b < totalBytes - read_per; b += read_per)
-                    {
-                        reader.Read(buffer, b, read_per);
-                        // PatchProgressBar.Value = (int)((float)(b / totalBytes) * 100 / 2);
-                    }
-
-                    for (var b = 0; b < buffer.Length - searchTerm.Length; ++b)
-                    {
-                        var match = true; 
-                        for(var r = 0; r < searchTerm.Length; ++r)
-                        {
-                            if(buffer[b + r] != searchTerm[r])
-                            {
-                                match = false;
-                                break;
-                            }
-                        }
-
-                        if (!match)
-                        {
-                            continue;
-                        }
-
-                        // match found, replace!
-                        for (var r = 0; r < searchTerm.Length; ++r)
-                        {
-                            buffer[b + r] = patch[r]; 
-                        }
-
-                        replaced_count += 1;
-                    }
-
-                    if(replaced_count == 0)
-                    {
-                        continue; 
-                    }
-
                     found = true; 
-
-                    // var dataString = Encoding.UTF8.GetString(read_buffer);
-                    // var foundIndex = dataString.IndexOf(searchTerm);
-                    // if (foundIndex >= 0)
-                    // {
-                    //     dataString = dataString.Replace(searchTerm, patch);
-                    //     write_buffer = Encoding.UTF8.GetBytes(dataString);
-                    //     found = true;
-                    // }
-                }
-
-                if (found)
-                {
-                    // using (var writer = File.OpenWrite(file))
-                    // {
-                    //     var totalBytes = buffer.Length;
-                    //     var write_per = (int)Math.Min(totalBytes, 1024);
-                    //     for(var b = 0; b < totalBytes - write_per; b += write_per)
-                    //     {
-                    //         writer.Write(buffer, b, write_per);
-                    //         PatchProgressBar.Value = (int)((float)(b / totalBytes) * 100 / 2);
-                    //     }
-                    // }
-
-                    var encoding = Encoding.GetEncoding("shift_jis");
-                    var searchTermString = encoding.GetString(searchTerm);
-                    var patchString = encoding.GetString(patch);
-                    var log = string.Format($"Replaced \"{searchTermString}\" with \"{patchString}\" at \"{file}\", ({replaced_count} instances)");
-                    Log(log);
                 }
             }
 
             return found;
+        }
+
+        private bool PatchFile(string file, byte[] searchTerm, byte[] patch)
+        {
+            var found = false;
+
+            byte[] buffer = null;
+            var replaced_count = 0;
+
+            using (var reader = File.OpenRead(file))
+            {
+                var totalBytes = reader.Length;
+                buffer = new byte[totalBytes];
+
+                var read_per = (int)Math.Min(totalBytes, 1024);
+                for (var b = 0; b < totalBytes - read_per; b += read_per)
+                {
+                    reader.Read(buffer, b, read_per);
+                }
+
+                for (var b = 0; b < buffer.Length - searchTerm.Length; ++b)
+                {
+                    var match = true;
+                    for (var r = 0; r < searchTerm.Length; ++r)
+                    {
+                        if (buffer[b + r] != searchTerm[r])
+                        {
+                            match = false;
+                            break;
+                        }
+                    }
+
+                    if (!match)
+                    {
+                        continue;
+                    }
+
+                    // match found, replace!
+                    for (var r = 0; r < searchTerm.Length; ++r)
+                    {
+                        buffer[b + r] = patch[r];
+                    }
+
+                    replaced_count += 1;
+                }
+                
+                found = replaced_count > 0;
+            }
+
+            if (found)
+            {
+                // using (var writer = File.OpenWrite(file))
+                // {
+                //     var totalBytes = buffer.Length;
+                //     var write_per = (int)Math.Min(totalBytes, 1024);
+                //     for(var b = 0; b < totalBytes - write_per; b += write_per)
+                //     {
+                //         writer.Write(buffer, b, write_per);
+                //         PatchProgressBar.Value = (int)((float)(b / totalBytes) * 100 / 2);
+                //     }
+                // }
+
+                var encoding = Encoding.GetEncoding("shift_jis");
+                var searchTermString = encoding.GetString(searchTerm);
+                var patchString = encoding.GetString(patch);
+                var log = string.Format($"Replaced \"{searchTermString}\" with \"{patchString}\" at \"{file}\", ({replaced_count} instances)");
+                Log(log);
+            }
+
+            return found; 
         }
 
         public void Log(string value)
@@ -271,6 +279,17 @@ namespace TestApp
             }
 
             OutputText.Text = string.Format("{0}\r\n{1}", value, OutputText.Text);
+        }
+
+        public void UpdateProress(int addProgress)
+        {
+            if (InvokeRequired)
+            {
+                this.Invoke(new Action<int>(UpdateProress), new object[] { addProgress });
+                return;
+            }
+
+            PatchProgressBar.Value += addProgress;
         }
     }
 }
