@@ -87,7 +87,17 @@ namespace TestApp
             var outputPath = OutputFileText.Text;
             var patchData = PatchFileData.Text;
 
-            DoApplyPatch(inputPath, outputPath, patchData);
+            ApplyPatchButton.Enabled = false;
+            
+            var thread = new System.Threading.Thread(() =>
+            {
+                Log("Starting..");
+                DoApplyPatch(inputPath, outputPath, patchData);
+                ApplyPatchButton.Enabled = true;
+                Log("Finished.");
+            });
+
+            thread.Start();
         }
 
         private void SelectPatchFileButton_Click(object sender, EventArgs e)
@@ -115,86 +125,152 @@ namespace TestApp
 
                 var original = data[0];
                 var translation = data[1];
-                
-                // enforce the translation to equal the number of bytes we're patching 
-                var originalBytes = Encoding.UTF8.GetBytes(original);
-                var translationBytes = Encoding.UTF8.GetBytes(translation); 
 
-                if(originalBytes.Length != translationBytes.Length)
+                Log($"Searching for {original}..");
+
+                // enforce the translation to equal the number of bytes we're patching 
+                var encoding = Encoding.GetEncoding("shift_jis");
+                var originalBytes = encoding.GetBytes(original);
+                var translationBytes = encoding.GetBytes(translation);
+                var spaces = encoding.GetBytes(" ");
+
+                if (originalBytes.Length != translationBytes.Length)
                 {
                     var cutTranslation = new byte[originalBytes.Length];
-                    for(var b = 0; b < cutTranslation.Length; ++b)
+                    for(var b = 0; b < originalBytes.Length; ++b)
                     {
-                        cutTranslation[b] = translationBytes[b];
+                        if(b >= translationBytes.Length)
+                        {
+                            cutTranslation[b] = spaces[0]; 
+                        }
+                        else
+                        {
+                            cutTranslation[b] = translationBytes[b];
+                        }
                     }
                     translationBytes = cutTranslation;
                 }
 
-                var success = FindAndPatch(inputFolder, original, translation);
+                try
+                {
+                    var success = FindAndPatch(inputFolder, originalBytes, translationBytes);
+
+                }
+                catch(System.Exception e)
+                {
+                    Log(e.StackTrace);
+                    Log(e.Message);
+                }
             }
 
         }
 
-        private bool FindAndPatch(string path, string searchTerm, string patch)
+        private bool FindAndPatch(string path, byte[] searchTerm, byte[] patch)
         {
+            bool found = false;
             var directories = Directory.GetDirectories(path);
             foreach (var directory in directories)
             {
                 if (FindAndPatch(directory, searchTerm, patch))
                 {
-                    return true;
+                    found = true; 
                 }
             }
 
             var files = Directory.GetFiles(path);
             foreach (var file in files)
             {
-                byte[] write_buffer = null;
-                bool found = false;
-                
+                byte[] buffer = null;
+                var replaced_count = 0;
+
                 using (var reader = File.OpenRead(file))
                 {
                     var totalBytes = reader.Length;
-                    var read_buffer = new byte[totalBytes]; 
+                    buffer = new byte[totalBytes];
 
-                    var read_per = (int) Math.Min(totalBytes, 1024); 
-                    for(var b = 0; b < totalBytes - read_per; b += read_per)
+                    var read_per = (int)Math.Min(totalBytes, 1024);
+                    for (var b = 0; b < totalBytes - read_per; b += read_per)
                     {
-                        reader.Read(read_buffer, b, read_per);
-                        PatchProgressBar.Value = (int) ((float) (b / totalBytes) * 100 / 2);
+                        reader.Read(buffer, b, read_per);
+                        // PatchProgressBar.Value = (int)((float)(b / totalBytes) * 100 / 2);
                     }
 
-                    var dataString = Encoding.UTF8.GetString(read_buffer);
-                    var foundIndex = dataString.IndexOf(searchTerm);
-                    if(foundIndex >= 0)
+                    for (var b = 0; b < buffer.Length - searchTerm.Length; ++b)
                     {
-                        dataString = dataString.Replace(searchTerm, patch);
-                        write_buffer = Encoding.UTF8.GetBytes(dataString);
-                        found = true; 
+                        var match = true; 
+                        for(var r = 0; r < searchTerm.Length; ++r)
+                        {
+                            if(buffer[b + r] != searchTerm[r])
+                            {
+                                match = false;
+                                break;
+                            }
+                        }
+
+                        if (!match)
+                        {
+                            continue;
+                        }
+
+                        // match found, replace!
+                        for (var r = 0; r < searchTerm.Length; ++r)
+                        {
+                            buffer[b + r] = patch[r]; 
+                        }
+
+                        replaced_count += 1;
                     }
+
+                    if(replaced_count == 0)
+                    {
+                        continue; 
+                    }
+
+                    found = true; 
+
+                    // var dataString = Encoding.UTF8.GetString(read_buffer);
+                    // var foundIndex = dataString.IndexOf(searchTerm);
+                    // if (foundIndex >= 0)
+                    // {
+                    //     dataString = dataString.Replace(searchTerm, patch);
+                    //     write_buffer = Encoding.UTF8.GetBytes(dataString);
+                    //     found = true;
+                    // }
                 }
 
                 if (found)
                 {
                     // using (var writer = File.OpenWrite(file))
                     // {
-                    //     var totalBytes = write_buffer.Length;
+                    //     var totalBytes = buffer.Length;
                     //     var write_per = (int)Math.Min(totalBytes, 1024);
                     //     for(var b = 0; b < totalBytes - write_per; b += write_per)
                     //     {
-                    //         writer.Write(write_buffer, b, write_per);
+                    //         writer.Write(buffer, b, write_per);
                     //         PatchProgressBar.Value = (int)((float)(b / totalBytes) * 100 / 2);
                     //     }
                     // }
 
-                    var log = string.Format($"Replaced \"{searchTerm}\" with \"{patch}\" at \"{path}\"");
-                    OutputText.AppendText(log);
-
-                    return false; 
+                    var encoding = Encoding.GetEncoding("shift_jis");
+                    var searchTermString = encoding.GetString(searchTerm);
+                    var patchString = encoding.GetString(patch);
+                    var log = string.Format($"Replaced \"{searchTermString}\" with \"{patchString}\" at \"{file}\", ({replaced_count} instances)");
+                    Log(log);
                 }
             }
 
-            return false;
+            return found;
+        }
+
+        public void Log(string value)
+        {
+            if (InvokeRequired)
+            {
+                this.Invoke(new Action<string>(Log), new object[] { value });
+                return;
+            }
+
+            OutputText.Text = string.Format("{0}\r\n{1}", value, OutputText.Text);
         }
     }
 }
