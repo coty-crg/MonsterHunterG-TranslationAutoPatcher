@@ -1,0 +1,10 @@
+C:\Users\coty-\source\repos\TestApp\TestApp\bin\Debug\IsoTranslationPatcher.exe.config
+C:\Users\coty-\source\repos\TestApp\TestApp\bin\Debug\IsoTranslationPatcher.exe
+C:\Users\coty-\source\repos\TestApp\TestApp\bin\Debug\IsoTranslationPatcher.pdb
+C:\Users\coty-\source\repos\TestApp\TestApp\obj\Debug\IsoTranslationPatcher.csprojAssemblyReference.cache
+C:\Users\coty-\source\repos\TestApp\TestApp\obj\Debug\TestApp.Form1.resources
+C:\Users\coty-\source\repos\TestApp\TestApp\obj\Debug\TestApp.Properties.Resources.resources
+C:\Users\coty-\source\repos\TestApp\TestApp\obj\Debug\IsoTranslationPatcher.csproj.GenerateResource.cache
+C:\Users\coty-\source\repos\TestApp\TestApp\obj\Debug\IsoTranslationPatcher.csproj.CoreCompileInputs.cache
+C:\Users\coty-\source\repos\TestApp\TestApp\obj\Debug\IsoTranslationPatcher.exe
+C:\Users\coty-\source\repos\TestApp\TestApp\obj\Debug\IsoTranslationPatcher.pdb

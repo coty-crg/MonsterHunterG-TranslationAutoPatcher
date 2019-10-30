@@ -89,7 +89,7 @@ namespace TestApp
 
             // skip first line, its the header info 
             PatchProgressBar.Minimum = 0;
-            PatchProgressBar.Maximum = patchData.Split('\n').Length;
+            PatchProgressBar.Maximum = patchData.Split('\n').Length * AddFileCounter(inputPath);
 
             OutputFileButton.Enabled = false;
             SelectFolderButton.Enabled = false; 
@@ -129,64 +129,34 @@ namespace TestApp
         
         private void DoApplyPatch(string inputFolder, string outputFile, string patchData)
         {
+
             // skip first line, its the header info 
             var patches = patchData.Split('\n');
-            for(var p = 1; p < patches.Length; ++p) 
-            {
-                UpdateProress(1);
-
-                var patch = patches[p];
-                var data = patch.Split(',');
-
-                var original = data[0];
-                var translation = data[1];
-
-                Log($"Searching for {original}..");
-
-                // enforce the translation to equal the number of bytes we're patching 
-                var encoding = Encoding.GetEncoding("shift_jis");
-                var originalBytes = encoding.GetBytes(original);
-                var translationBytes = encoding.GetBytes(translation);
-                var spaces = encoding.GetBytes(" ");
-
-                if (originalBytes.Length != translationBytes.Length)
-                {
-                    var cutTranslation = new byte[originalBytes.Length];
-                    for(var b = 0; b < originalBytes.Length; ++b)
-                    {
-                        if(b >= translationBytes.Length)
-                        {
-                            cutTranslation[b] = spaces[0]; 
-                        }
-                        else
-                        {
-                            cutTranslation[b] = translationBytes[b];
-                        }
-                    }
-                    translationBytes = cutTranslation;
-                }
-
-                try
-                {
-                    var success = FindAndPatch(inputFolder, originalBytes, translationBytes);
-
-                }
-                catch(System.Exception e)
-                {
-                    Log(e.StackTrace);
-                    Log(e.Message);
-                }
-            }
-
+            patches = patches.OrderByDescending((a) => a.Length).ToArray();
+            
+            FindAndPatch(inputFolder, patches); 
         }
 
-        private bool FindAndPatch(string path, byte[] searchTerm, byte[] patch)
+        private int AddFileCounter(string path)
+        {
+            var counter = 0; 
+            var directories = Directory.GetDirectories(path);
+            foreach (var directory in directories)
+            {
+                counter += AddFileCounter(directory); 
+            }
+            
+            counter += Directory.GetFiles(path).Length;
+            return counter; 
+        }
+
+        private bool FindAndPatch(string path, string[] patches)
         {
             bool found = false;
             var directories = Directory.GetDirectories(path);
             foreach (var directory in directories)
             {
-                if (FindAndPatch(directory, searchTerm, patch))
+                if (FindAndPatch(directory, patches))
                 {
                     found = true; 
                 }
@@ -195,7 +165,7 @@ namespace TestApp
             var files = Directory.GetFiles(path);
             foreach (var file in files)
             {
-                if(PatchFile(file, searchTerm, patch))
+                if(PatchFile(file, patches))
                 {
                     found = true; 
                 }
@@ -204,51 +174,100 @@ namespace TestApp
             return found;
         }
 
-        private bool PatchFile(string file, byte[] searchTerm, byte[] patch)
+        private bool PatchFile(string file, string[] patches)
         {
             var found = false;
 
             byte[] buffer = null;
             var replaced_count = 0;
-
+            
             using (var reader = File.OpenRead(file))
             {
                 var totalBytes = reader.Length;
                 buffer = new byte[totalBytes];
-
-                var max_string_size = searchTerm.Length;
+                
                 var read_per = (int)Math.Min(totalBytes, 1024);
                 for (var b = 0; b < totalBytes - read_per; b += read_per)
                 {
                     reader.Read(buffer, b, read_per);
                 }
 
-                for (var b = 0; b < buffer.Length - searchTerm.Length; ++b)
+                //
+                for (var p = 1; p < patches.Length; ++p)
                 {
-                    var match = true;
-                    for (var r = 0; r < searchTerm.Length; ++r)
-                    {
-                        if (buffer[b + r] != searchTerm[r])
-                        {
-                            match = false;
-                            break;
-                        }
-                    }
+                    UpdateProress(1);
 
-                    if (!match)
+                    var patchData = patches[p];
+                    var data = patchData.Split(',');
+
+                    if (data.Length < 3)
                     {
                         continue;
                     }
 
-                    // match found, replace!
-                    for (var r = 0; r < searchTerm.Length; ++r)
+                    var original = data[0];
+                    var translation = data[2];
+
+                    if(string.IsNullOrEmpty(original) || string.IsNullOrEmpty(translation))
                     {
-                        buffer[b + r] = patch[r];
+                        continue; 
+                    }
+                    
+                    // enforce the translation to equal the number of bytes we're patching 
+                    var encoding = Encoding.GetEncoding("shift_jis"); // "shift_jis"
+                    var searchTerm = encoding.GetBytes(original);
+                    var patch = encoding.GetBytes(translation);
+                    var spaces = encoding.GetBytes(" ");
+
+                    if (searchTerm.Length != patch.Length)
+                    {
+                        var cutTranslation = new byte[searchTerm.Length];
+                        for (var b = 0; b < searchTerm.Length; ++b)
+                        {
+                            if (b >= patch.Length)
+                            {
+                                cutTranslation[b] = spaces[0];
+                            }
+                            else
+                            {
+                                cutTranslation[b] = patch[b];
+                            }
+                        }
+                        patch = cutTranslation;
                     }
 
-                    replaced_count += 1;
+                    // var success = FindAndPatch(inputFolder, originalBytes, translationBytes);
+
+                    for (var b = 0; b < buffer.Length - searchTerm.Length; ++b)
+                    {
+                        var match = true;
+                        for (var r = 0; r < searchTerm.Length; ++r)
+                        {
+                            if (buffer[b + r] != searchTerm[r])
+                            {
+                                match = false;
+                                break;
+                            }
+                        }
+
+                        if (!match)
+                        {
+                            continue;
+                        }
+
+                        // match found, replace!
+                        for (var r = 0; r < searchTerm.Length; ++r)
+                        {
+                            buffer[b + r] = patch[r];
+                        }
+
+                        replaced_count += 1;
+                    }
                 }
-                
+                //
+
+
+
                 found = replaced_count > 0;
             }
 
@@ -264,11 +283,16 @@ namespace TestApp
                     }
                 }
 
-                var encoding = Encoding.GetEncoding("shift_jis");
-                var searchTermString = encoding.GetString(searchTerm);
-                var patchString = encoding.GetString(patch);
-                var log = string.Format($"Replaced \"{searchTermString}\" with \"{patchString}\" at \"{file}\", ({replaced_count} instances)");
-                Log(log);
+                // var encoding = Encoding.GetEncoding("shift_jis");
+                // var searchTermString = encoding.GetString(searchTerm);
+                // var patchString = encoding.GetString(patch);
+                // var log = string.Format($"Replaced \"{searchTermString}\" with \"{patchString}\" at \"{file}\", ({replaced_count} instances)");
+                // Log(log);
+                Log($"success! ({replaced_count} instances) at \"{file}\"");
+            }
+            else
+            {
+                Log($"skipping \"{file}\"");
             }
 
             return found; 
