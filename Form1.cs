@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DiscUtils.Iso9660;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -35,10 +36,10 @@ namespace TestApp
 
         private void button1_Click(object sender, EventArgs e)
         {
-            SelectFolderDialog.ShowDialog();
+            OpenISODialog.ShowDialog();
             
-            var path = SelectFolderDialog.SelectedPath;
-            SelectFolderText.Text = path;
+            var path = OpenISODialog.FileName;
+            SelectISOText.Text = path;
 
             TryEnableApplyButton();
         }
@@ -65,7 +66,7 @@ namespace TestApp
 
         private void TryEnableApplyButton()
         {
-            var input = SelectFolderText.Text; 
+            var input = SelectISOText.Text; 
             var output = OutputFileText.Text;
             var patchData = PatchFileData.Text;
 
@@ -83,13 +84,14 @@ namespace TestApp
 
         private void ApplyPatchButton_Click(object sender, EventArgs e)
         {
-            var inputPath = SelectFolderText.Text;
+            var inputFile = SelectISOText.Text;
             var outputPath = OutputFileText.Text;
             var patchData = PatchFileData.Text;
 
+            // todo 
             // skip first line, its the header info 
             PatchProgressBar.Minimum = 0;
-            PatchProgressBar.Maximum = patchData.Split('\n').Length * AddFileCounter(inputPath);
+            PatchProgressBar.Maximum = patchData.Split('\n').Length; // * AddFileCounter(inputFile);
 
             OutputFileButton.Enabled = false;
             SelectFolderButton.Enabled = false; 
@@ -100,7 +102,10 @@ namespace TestApp
             var thread = new System.Threading.Thread(() =>
             {
                 Log("Starting..");
-                DoApplyPatch(inputPath, outputPath, patchData);
+
+                    DoApplyPatchISO(inputFile, outputPath, patchData);
+
+
                 Log("Finished.");
                 
                 // run on main thread 
@@ -127,9 +132,109 @@ namespace TestApp
             TryEnableApplyButton(); 
         }
         
-        private void DoApplyPatch(string inputFolder, string outputFile, string patchData)
+        private void DoApplyPatchISO(string inputFile, string outputFile, string patchData)
         {
+            var tempFolder = "./temp";
 
+            ExtractISO(inputFile, tempFolder);
+
+            // todo: extract from AFS files
+            // todo: decompress extracted AFS files
+            // todo: patch decompressed file
+            // todo: recompress patched extracted AFS files
+            // todo: reinject AFS file
+
+            RepackISO(tempFolder, outputFile); 
+        }
+
+        private void ExtractISO(string inputFile, string outputFolder)
+        {
+            using (FileStream isoStream = File.Open(inputFile, FileMode.Open))
+            {
+                var reader_cd = new CDReader(isoStream, true);
+                ExtractISO_Directory(reader_cd, outputFolder, "");
+            }
+        }
+
+        private void ExtractISO_Directory(CDReader cd, string outputFolder, string cd_path)
+        {
+            var real_directory = string.Format("{0}/{1}", outputFolder, cd_path);
+            if (!Directory.Exists(real_directory))
+            {
+                Directory.CreateDirectory(real_directory);
+            }
+            
+            var cd_directories = cd.GetDirectories(cd_path);
+            foreach (var cd_directory in cd_directories)
+            {
+                ExtractISO_Directory(cd, outputFolder, cd_directory); 
+            }
+
+            var cd_files = cd.GetFiles(cd_path);
+            foreach(var cd_file in cd_files)
+            {
+                var fileStream = cd.OpenFile(cd_file, FileMode.Open);
+                var real_file = string.Format("{0}/{1}", outputFolder, cd_file);
+
+                Log($"writing {cd_file} to {real_file}");
+
+                using (var writerStream = File.OpenWrite(real_file))
+                {
+                    var max_chunk = 1024;
+                    var buffer = new byte[max_chunk];
+
+                    for(var b = 0; b < fileStream.Length - max_chunk; b += max_chunk)
+                    {
+                        var amount = (int) Math.Min(max_chunk, fileStream.Length - max_chunk);
+                        fileStream.Read(buffer, 0, amount);
+                        writerStream.Write(buffer, 0, amount); 
+                    }
+                }
+
+                fileStream.Dispose(); 
+            }
+        }
+
+        private void RepackISO(string inputFolder, string outputFile)
+        {
+            var writer_cd = new CDBuilder();
+            RepackISO_Directory(writer_cd, inputFolder, inputFolder);
+            writer_cd.Build(outputFile);
+        }
+
+        private void RepackISO_Directory(CDBuilder cd, string rootFolder, string inputFolder)
+        {
+            var directories = Directory.GetDirectories(inputFolder);
+            foreach(var directory in directories)
+            {
+                var cd_directory = directory.Replace(rootFolder, string.Empty);
+                cd.AddDirectory(cd_directory);
+
+                RepackISO_Directory(cd, rootFolder, directory);
+            }
+
+            var files = Directory.GetFiles(inputFolder);
+            foreach(var file in files)
+            {
+                byte[] buffer = null;
+                using (var readStream = File.OpenRead(file))
+                {
+                    buffer = new byte[readStream.Length];
+                    var max_size = 1024; 
+                    
+                    for(var b = 0; b < readStream.Length - max_size; b += max_size)
+                    {
+                        readStream.Read(buffer, b, (int) Math.Min(max_size, readStream.Length - max_size)); 
+                    }
+                }
+                
+                var cd_file = file.Replace(rootFolder, string.Empty);
+                var writeStream = cd.AddFile(cd_file, buffer);
+            }
+        }
+
+        private void DoApplyPatchRecursivelyForFolder(string inputFolder, string outputFile, string patchData)
+        {
             // skip first line, its the header info 
             var patches = patchData.Split('\n');
             patches = patches.OrderByDescending((a) => a.Length).ToArray();

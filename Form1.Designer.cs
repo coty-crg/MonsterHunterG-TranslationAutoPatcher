@@ -31,7 +31,7 @@
             this.SelectFolderButton = new System.Windows.Forms.Button();
             this.SelectFolderDialog = new System.Windows.Forms.FolderBrowserDialog();
             this.PatchProgressBar = new System.Windows.Forms.ProgressBar();
-            this.SelectFolderText = new System.Windows.Forms.TextBox();
+            this.SelectISOText = new System.Windows.Forms.TextBox();
             this.OutputFileButton = new System.Windows.Forms.Button();
             this.OutputFileDialog = new System.Windows.Forms.SaveFileDialog();
             this.OutputFileText = new System.Windows.Forms.TextBox();
@@ -41,6 +41,7 @@
             this.PatchFileData = new System.Windows.Forms.TextBox();
             this.SelectPatchFileDialog = new System.Windows.Forms.OpenFileDialog();
             this.OutputText = new System.Windows.Forms.TextBox();
+            this.OpenISODialog = new System.Windows.Forms.OpenFileDialog();
             this.SuspendLayout();
             // 
             // SelectFolderButton
@@ -65,13 +66,13 @@
             this.PatchProgressBar.TabIndex = 1;
             this.PatchProgressBar.Click += new System.EventHandler(this.PatchProgressBar_Click);
             // 
-            // SelectFolderText
+            // SelectISOText
             // 
-            this.SelectFolderText.Location = new System.Drawing.Point(12, 144);
-            this.SelectFolderText.Name = "SelectFolderText";
-            this.SelectFolderText.Size = new System.Drawing.Size(142, 20);
-            this.SelectFolderText.TabIndex = 2;
-            this.SelectFolderText.TextChanged += new System.EventHandler(this.SelectFolderText_TextChanged);
+            this.SelectISOText.Location = new System.Drawing.Point(12, 144);
+            this.SelectISOText.Name = "SelectISOText";
+            this.SelectISOText.Size = new System.Drawing.Size(142, 20);
+            this.SelectISOText.TabIndex = 2;
+            this.SelectISOText.TextChanged += new System.EventHandler(this.SelectFolderText_TextChanged);
             // 
             // OutputFileButton
             // 
@@ -143,6 +144,10 @@
             this.OutputText.Size = new System.Drawing.Size(292, 154);
             this.OutputText.TabIndex = 9;
             // 
+            // OpenISODialog
+            // 
+            this.OpenISODialog.FileName = "file.ISO";
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -155,7 +160,7 @@
             this.Controls.Add(this.ApplyPatchButton);
             this.Controls.Add(this.OutputFileText);
             this.Controls.Add(this.OutputFileButton);
-            this.Controls.Add(this.SelectFolderText);
+            this.Controls.Add(this.SelectISOText);
             this.Controls.Add(this.PatchProgressBar);
             this.Controls.Add(this.SelectFolderButton);
             this.Name = "Form1";
@@ -171,7 +176,7 @@
         private System.Windows.Forms.Button SelectFolderButton;
         private System.Windows.Forms.FolderBrowserDialog SelectFolderDialog;
         private System.Windows.Forms.ProgressBar PatchProgressBar;
-        private System.Windows.Forms.TextBox SelectFolderText;
+        private System.Windows.Forms.TextBox SelectISOText;
         private System.Windows.Forms.Button OutputFileButton;
         private System.Windows.Forms.SaveFileDialog OutputFileDialog;
         private System.Windows.Forms.TextBox OutputFileText;
@@ -181,6 +186,7 @@
         private System.Windows.Forms.TextBox PatchFileData;
         private System.Windows.Forms.OpenFileDialog SelectPatchFileDialog;
         private System.Windows.Forms.TextBox OutputText;
+        private System.Windows.Forms.OpenFileDialog OpenISODialog;
     }
 }
 
