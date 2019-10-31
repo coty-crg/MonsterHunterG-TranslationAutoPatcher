@@ -392,32 +392,42 @@ namespace TestApp
                     dataBlockLength += blockSize; 
                 }
 
+                
+
                 afs.data = new byte[dataBlockLength]; 
 
                 // read all the files 
-                var dataIndex = 0u; 
-                for(var i = 0; i < afs.numFiles; ++i)
-                {
-                    var entry = afs.tableOfContents[i];
-                    var multiple = (entry.length / 2048) + 1;
-                    var blockSize = multiple * 2048;
-                    
-                    stream.Read(afs.data, (int) dataIndex, (int) blockSize);
-                    dataIndex += blockSize;
-                }
+                // var dataIndex = 0u; 
+                // for(var i = 0; i < afs.numFiles; ++i)
+                // {
+                //     var entry = afs.tableOfContents[i];
+                // 
+                // 
+                // 
+                //     // var multiple = (entry.length / 2048) + 1;
+                //     // var blockSize = multiple * 2048;
+                //     // 
+                //     // stream.Read(afs.data, (int) dataIndex, (int) blockSize);
+                //     // dataIndex += blockSize;
+                // }
                 
 
                 afs.directory = new AFS_Directory_Entry[afs.numFiles];
 
+
+
+                var dataBlockStart = afs.tableOfContents[0].offset;
+                var directoryOffsetStreamStart = dataBlockStart - 8;
+                stream.Position = directoryOffsetStreamStart;
+                stream.Position = BinaryHelper.ReadUInt32(stream);
+
                 for (var i = 0; i < afs.numFiles; ++i)
                 {
                     var toc_entry = afs.tableOfContents[i];
-
-                    // stream.Seek(toc_entry.filenameDirectoryOffset, SeekOrigin.End);
-
+                    toc_entry.filenameDirectoryOffset = (uint) stream.Position; // reference 
+                    
                     var directory_entry = AFS_Directory_Entry.FromStream(stream);
                     afs.directory[i] = directory_entry;
-
                 }
 
                 return afs; 
@@ -432,32 +442,33 @@ namespace TestApp
             {
                 var archive = AFS.FromStream(reader);
 
-                Log($"header: {archive.header}"); 
-                Log($"numFiles: {archive.numFiles}");
+                Log($"header: {archive.header}\r\n"); 
+                Log($"numFiles: {archive.numFiles}\r\n");
 
-                for (var i = 0; i < archive.numFiles; ++i)
-                {
-                    var toc_entry = archive.tableOfContents[i];
-
-                    Log($"length: {toc_entry.length}");
-                    Log($"offset: {toc_entry.offset}");
-
-                    Log($"filenameDirectoryLength: {toc_entry.filenameDirectoryLength}");
-                    Log($"filenameDirectoryOffset: {toc_entry.filenameDirectoryOffset}");
-                }
-
-                // for (var i = 0; i < archive.directory.Length; ++i)
+                // for (var i = 0; i < archive.numFiles; ++i)
                 // {
                 //     var toc_entry = archive.tableOfContents[i];
-                //     var directory_entry = archive.directory[i];
                 // 
-                //     if(toc_entry.length != directory_entry.fileLength)
-                //     {
-                //         Log($"toc_entry and directory_entry lengths do not match!");
-                //     }
+                //     Log($"length: {toc_entry.length}");
+                //     Log($"offset: {toc_entry.offset}");
                 // 
-                //     Log($"found AFS packed file: name: {directory_entry.filename}, length: {directory_entry.fileLength}");
+                //     Log($"filenameDirectoryLength: {toc_entry.filenameDirectoryLength}");
+                //     Log($"filenameDirectoryOffset: {toc_entry.filenameDirectoryOffset}");
                 // }
+
+                for (var i = 0; i < archive.directory.Length; ++i)
+                {
+                    var toc_entry = archive.tableOfContents[i];
+                    var directory_entry = archive.directory[i];
+                
+                    if(toc_entry.length != directory_entry.fileLength)
+                    {
+                        Log("toc_entry and directory_entry lengths do not match!\r\n");
+                    }
+
+                    Log($"found AFS packed file: name: {directory_entry.filename}\r\n"); 
+                    Log($"with length: {directory_entry.fileLength}\r\n");
+                }
             }
         }
 
