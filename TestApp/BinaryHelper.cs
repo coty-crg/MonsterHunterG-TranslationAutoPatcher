@@ -29,9 +29,16 @@ namespace TestApp
             var encoding = Encoding.GetEncoding("shift_jis");
             var buffer = encoding.GetBytes(data);
 
+            // grow or truncate.. 
             if(buffer.Length != length)
             {
-                throw new InvalidDataException($"{buffer.Length} != {length}");
+                var temp = buffer;
+                buffer = new byte[length];
+
+                for(var i = 0; i < Math.Min(length, temp.Length); ++i)
+                {
+                    buffer[i] = temp[i];
+                }
             }
 
             stream.Write(buffer, 0, buffer.Length);

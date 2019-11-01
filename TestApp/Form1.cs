@@ -139,10 +139,17 @@ namespace TestApp
         
         private void DoApplyPatchISO(string inputFile, string outputFile, string patchData)
         {
+            var patches = GetPatches(patchData);
+
             DiscUtils.Complete.SetupHelper.SetupComplete();
 
             var tempFolder = "./temp";
             var tempFolderAFS = "./tempAFS";
+
+            if (!Directory.Exists(tempFolder))
+            {
+                Directory.CreateDirectory(tempFolder);
+            }
 
             if (!Directory.Exists(tempFolderAFS))
             {
@@ -154,17 +161,27 @@ namespace TestApp
             int bootLoadSegment;
             string volumeLabel;
 
-            // ExtractISO(inputFile, tempFolder, out bootImageStream, out bootLoadSegment, out volumeLabel);
+            ExtractISO(inputFile, tempFolder, out bootImageStream, out bootLoadSegment, out volumeLabel);
 
 
 
             var files = new List<string>() { "AFS_DATA.AFS" }; 
             foreach(var file in files)
             {
-                ExtractFromAFS(string.Format("{0}/{1}", tempFolder, file), string.Format("{0}/{1}", tempFolderAFS, file));
-            }
 
-            // todo: extract from AFS files
+                var inputDataFile = string.Format("{0}/{1}", tempFolder, file);
+                var outputDataFolder = string.Format("{0}/{1}", tempFolderAFS, file);
+                var archive = ExtractFromAFS(inputDataFile, outputDataFolder);
+
+                var targetFilename = "sub_main.bin";
+                var targetFilenameFull = string.Format("{0}/{1}", outputDataFolder, targetFilename);
+                UnpackAFS_File(targetFilenameFull);
+
+                PatchFile($"{targetFilenameFull}.unpacked", patches); 
+
+                RepackAFS_File(targetFilenameFull);
+            }
+            
             // todo: decompress extracted AFS files
             // todo: patch decompressed file
             // todo: recompress patched extracted AFS files
@@ -439,10 +456,8 @@ namespace TestApp
                 return afs; 
             }
         }
-
-
-
-        private void ExtractFromAFS(string input, string output)
+        
+        private AFS ExtractFromAFS(string input, string output)
         {
             using (var reader = File.OpenRead(input))
             {
@@ -450,17 +465,6 @@ namespace TestApp
 
                 Log($"header: {archive.header}\r\n"); 
                 Log($"numFiles: {archive.numFiles}\r\n");
-
-                // for (var i = 0; i < archive.numFiles; ++i)
-                // {
-                //     var toc_entry = archive.tableOfContents[i];
-                // 
-                //     Log($"length: {toc_entry.length}");
-                //     Log($"offset: {toc_entry.offset}");
-                // 
-                //     Log($"filenameDirectoryLength: {toc_entry.filenameDirectoryLength}");
-                //     Log($"filenameDirectoryOffset: {toc_entry.filenameDirectoryOffset}");
-                // }
 
                 if (!Directory.Exists(output))
                 {
@@ -480,29 +484,53 @@ namespace TestApp
                     {
                         writer.Write(file.data, 0, file.data.Length); 
                     }
-
-
-                    // if(toc_entry.length != directory_entry.fileLength)
-                    // {
-                    //     Log(string.Format("toc_entry and directory_entry lengths do not match! {0} != {1}"));
-                    // }
                     
-                    // var message = string.Format("length: {1}  toc_length: {2}", 
+                    // var message = string.Format("{0} | length: {1}, toc_length: {2}", 
                     //     directory_entry.filename , directory_entry.fileLength, toc_entry.length);
-                    // sb.AppendLine(message);
+                    // Log(message);
                 }
 
-                // Log(sb.ToString()); 
+                return archive;
             }
+
+            return null; 
+        }
+        
+        // returns output filename 
+        private void UnpackAFS_File(string input)
+        {
+            var command = $"crappack-cmd.py -u {input}";
+
+            Log("python.exe " + command);
+
+            var process = System.Diagnostics.Process.Start("python.exe", command);
+            process.WaitForExit();
         }
 
+        private void RepackAFS_File(string input)
+        {
+            var original = input;
+            var unpacked = $"{input}.unpacked";
 
-        private void DoApplyPatchRecursivelyForFolder(string inputFolder, string outputFile, string patchData)
+            var command = $"crappack-cmd.py -p {unpacked} -o {original}";
+
+            Log("python.exe " + command);
+
+            var process = System.Diagnostics.Process.Start("python.exe", command);
+            process.WaitForExit();
+        }
+
+        private string[] GetPatches(string patchData)
         {
             // skip first line, its the header info 
             var patches = patchData.Split('\n');
             patches = patches.OrderByDescending((a) => a.Length).ToArray();
-            
+            return patches;
+        }
+
+        private void DoApplyPatchRecursivelyForFolder(string inputFolder, string outputFile, string patchData)
+        {
+            var patches = GetPatches(patchData); 
             FindAndPatch(inputFolder, patches); 
         }
 
@@ -607,6 +635,7 @@ namespace TestApp
 
                     // var success = FindAndPatch(inputFolder, originalBytes, translationBytes);
 
+                    var found_any = false; 
                     for (var b = 0; b < buffer.Length - searchTerm.Length; ++b)
                     {
                         var match = true;
@@ -631,6 +660,12 @@ namespace TestApp
                         }
 
                         replaced_count += 1;
+                        found_any = true; 
+                    }
+
+                    if (found_any)
+                    {
+                        // Log($"Replaced {original} with {translation}"); 
                     }
                 }
                 //
