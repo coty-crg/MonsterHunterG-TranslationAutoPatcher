@@ -180,12 +180,14 @@ namespace TestApp
                 PatchFile($"{targetFilenameFull}.unpacked", patches); 
 
                 RepackAFS_File(targetFilenameFull);
+
+                // todo: reinject AFS file
+                var outputDataFile = string.Format("{0}/{1}.patched", tempFolder, file);
+                ReinjectInAFS(archive, targetFilenameFull, outputDataFile);
+                RebuildAFS(archive, outputDataFile); 
             }
             
-            // todo: decompress extracted AFS files
-            // todo: patch decompressed file
-            // todo: recompress patched extracted AFS files
-            // todo: reinject AFS file
+            // todo: repack AFS into ISO 
 
             // RepackISO(tempFolder, outputFile, bootImageStream, bootLoadSegment, volumeLabel); 
         }
@@ -233,7 +235,7 @@ namespace TestApp
 
                 var real_file = string.Format("{0}/{1}", outputFolder, cd_file);
 
-                Log($"writing {cd_file} to {real_file}");
+                Log($"extracting {cd_file} to {real_file}");
 
                 using (var writerStream = File.OpenWrite(real_file))
                 {
@@ -387,12 +389,6 @@ namespace TestApp
             public void WriteStream(FileStream stream)
             {
                 stream.Write(data, 0, data.Length);
-
-                var padding = 2048 - data.Length % 2048;
-                for(var p = 0; p < padding; ++p)
-                {
-                    stream.WriteByte(0);
-                }
             }
         }
 
@@ -455,6 +451,68 @@ namespace TestApp
 
                 return afs; 
             }
+
+            public void WriteStream(FileStream stream)
+            {
+                var padding_size = 2048;
+
+                // header 
+                BinaryHelper.WriteString(stream, header, 4);
+                BinaryHelper.WriteUInt32(stream, numFiles);
+
+                // table of contents 
+                for(var i = 0; i < numFiles; ++i)
+                {
+                    var toc_entry = tableOfContents[i];
+                    toc_entry.WriteStream(stream); 
+                }
+
+                BinaryHelper.WriteUInt32(stream, filenameDirectoryOffset);
+                BinaryHelper.WriteUInt32(stream, filenameDirectoryLength);
+
+                // padding
+                // BinaryHelper.WriteAFSPadding(stream, stream.Position, padding_size); 
+
+                // data (will need to update ToC entry's from here)
+                for (var i = 0; i < numFiles; ++i)
+                {
+                    var toc_entry = tableOfContents[i];
+                    toc_entry.offset = (uint) stream.Position; 
+                    
+                    var afs_file = files[i];
+                    afs_file.WriteStream(stream);
+
+                    // padding 
+                    BinaryHelper.WriteAFSPadding(stream, stream.Position, padding_size);
+                }
+
+                filenameDirectoryOffset = (uint) stream.Position;
+
+                // directory 
+                for (var i = 0; i < numFiles; ++i)
+                {
+                    var dir_entry = directory[i];
+                    dir_entry.WriteStream(stream); 
+                }
+
+                filenameDirectoryLength = (uint) (stream.Position - filenameDirectoryOffset);
+
+                // padding 
+                BinaryHelper.WriteAFSPadding(stream, stream.Position, padding_size);
+                
+                // go back and re-write the table of contents, with the updated information 
+                stream.Position = 8; // header = 4, numfiles = 4
+
+                // table of contents 
+                for (var i = 0; i < numFiles; ++i)
+                {
+                    var toc_entry = tableOfContents[i];
+                    toc_entry.WriteStream(stream);
+                }
+
+                BinaryHelper.WriteUInt32(stream, filenameDirectoryOffset);
+                BinaryHelper.WriteUInt32(stream, filenameDirectoryLength);
+            }
         }
         
         private AFS ExtractFromAFS(string input, string output)
@@ -496,6 +554,59 @@ namespace TestApp
             return null; 
         }
         
+        private void ReinjectInAFS(AFS afs, string input_file, string output_afs)
+        {
+            var shortFilename = input_file;
+            while (shortFilename.IndexOf('/') >= 0)
+            {
+                var until = shortFilename.IndexOf('/');
+                var start_index = until + 1;
+                var delta = shortFilename.Length - start_index;
+                shortFilename = shortFilename.Substring(start_index, delta); 
+            }
+
+            Log($"reinjecting into {shortFilename}");
+
+            var directory_index = -1;
+            for(var i = 0; i < afs.directory.Length; ++i)
+            {
+                var entry = afs.directory[i];
+                if(entry.filename == shortFilename)
+                {
+                    directory_index = i;
+                    break; 
+                }
+            }
+
+            // read in file to the block at directory_index
+            using (var reader = File.OpenRead(input_file))
+            {
+                var afs_file = afs.files[directory_index];
+                afs_file.data = new byte[reader.Length];
+                reader.Read(afs_file.data, 0, afs_file.data.Length);
+
+                // update lengths 
+                var toc_entry = afs.tableOfContents[directory_index];
+                toc_entry.length = (uint) afs_file.data.Length;
+
+                var directory_entry = afs.directory[directory_index];
+                directory_entry.fileLength = (uint)afs_file.data.Length;
+            }
+            
+        }
+
+        private void RebuildAFS(AFS afs, string output_afs)
+        {
+            Log("Saving AFS.");
+
+            using (var writer = File.OpenWrite(output_afs))
+            {
+                afs.WriteStream(writer);
+            }
+
+            Log("Saved AFS.");
+        }
+
         // returns output filename 
         private void UnpackAFS_File(string input)
         {

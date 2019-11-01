@@ -62,8 +62,7 @@ namespace TestApp
             stream.WriteByte( (byte) (data >> 00) );
             stream.WriteByte( (byte) (data >> 08) );
         }
-
-
+        
         public static uint ReadUInt32(FileStream stream)
         {
             uint result = 0;
@@ -87,6 +86,21 @@ namespace TestApp
             stream.WriteByte((byte)(data >> 08));
             stream.WriteByte((byte)(data >> 16));
             stream.WriteByte((byte)(data >> 24));
+        }
+
+        public static void WritePadding(FileStream stream, long length)
+        {
+            var buffer = new byte[length];
+            stream.Write(buffer, 0, buffer.Length);
+        }
+
+        public static void WriteAFSPadding(FileStream stream, long streamPosition, long blockSize = 2048L)
+        {
+            if(streamPosition % blockSize != 0)
+            {
+                var padding = blockSize - streamPosition % blockSize;
+                WritePadding(stream, padding); 
+            }
         }
     }
 }
