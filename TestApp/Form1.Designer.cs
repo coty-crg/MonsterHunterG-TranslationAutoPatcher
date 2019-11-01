@@ -129,9 +129,11 @@
             // 
             // PatchFileData
             // 
+            this.PatchFileData.AllowDrop = true;
             this.PatchFileData.Location = new System.Drawing.Point(160, 170);
             this.PatchFileData.Multiline = true;
             this.PatchFileData.Name = "PatchFileData";
+            this.PatchFileData.ScrollBars = System.Windows.Forms.ScrollBars.Both;
             this.PatchFileData.Size = new System.Drawing.Size(142, 89);
             this.PatchFileData.TabIndex = 8;
             // 
@@ -145,8 +147,10 @@
             this.OutputText.Location = new System.Drawing.Point(12, 389);
             this.OutputText.Multiline = true;
             this.OutputText.Name = "OutputText";
+            this.OutputText.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
             this.OutputText.Size = new System.Drawing.Size(292, 154);
             this.OutputText.TabIndex = 9;
+            this.OutputText.TextChanged += new System.EventHandler(this.OutputText_TextChanged);
             // 
             // OpenISODialog
             // 
@@ -167,7 +171,11 @@
             this.Controls.Add(this.SelectISOText);
             this.Controls.Add(this.PatchProgressBar);
             this.Controls.Add(this.SelectFolderButton);
+            this.MaximizeBox = false;
+            this.MaximumSize = new System.Drawing.Size(332, 594);
+            this.MinimumSize = new System.Drawing.Size(332, 594);
             this.Name = "Form1";
+            this.ShowIcon = false;
             this.Text = "ISO Translation Patcher";
             this.Load += new System.EventHandler(this.Form1_Load);
             this.ResumeLayout(false);

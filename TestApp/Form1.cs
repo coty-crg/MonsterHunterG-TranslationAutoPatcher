@@ -295,17 +295,12 @@ namespace TestApp
             public uint offset;
             public uint length;
 
-            public uint filenameDirectoryOffset;
-            public uint filenameDirectoryLength;
-
             public static AFS_TOC_Entry FromStream(FileStream stream)
             {
                 var entry = new AFS_TOC_Entry();
 
                 entry.offset = BinaryHelper.ReadUInt32(stream);
                 entry.length = BinaryHelper.ReadUInt32(stream);
-                entry.filenameDirectoryOffset = BinaryHelper.ReadUInt32(stream);
-                entry.filenameDirectoryLength = BinaryHelper.ReadUInt32(stream);
 
                 return entry;
             }
@@ -314,8 +309,6 @@ namespace TestApp
             {
                 BinaryHelper.WriteUInt32(stream, offset);
                 BinaryHelper.WriteUInt32(stream, length);
-                BinaryHelper.WriteUInt32(stream, filenameDirectoryOffset);
-                BinaryHelper.WriteUInt32(stream, filenameDirectoryLength);
             }
         }
 
@@ -359,73 +352,86 @@ namespace TestApp
             }
         }
 
+        private class AFS_File
+        {
+            public byte[] data; 
+
+            public static AFS_File FromStream(FileStream stream, uint offset, uint length)
+            {
+                var file = new AFS_File();
+                file.data = new byte[length];
+
+                stream.Position = offset; 
+                stream.Read(file.data, 0, (int) length);
+
+                return file; 
+            }
+
+            public void WriteStream(FileStream stream)
+            {
+                stream.Write(data, 0, data.Length);
+
+                var padding = 2048 - data.Length % 2048;
+                for(var p = 0; p < padding; ++p)
+                {
+                    stream.WriteByte(0);
+                }
+            }
+        }
+
         private class AFS
         {
             public string header;
             public uint numFiles;
 
             public AFS_TOC_Entry[] tableOfContents;
+
+            public uint filenameDirectoryOffset;
+            public uint filenameDirectoryLength;
+            
+            public AFS_File[] files;
             public AFS_Directory_Entry[] directory;
             
-            public byte[] data;
-
-
             public static AFS FromStream(FileStream stream)
             {
                 var afs = new AFS();
 
                 afs.header = BinaryHelper.ReadString(stream, 4);
                 afs.numFiles = BinaryHelper.ReadUInt32(stream);
-
-                uint dataBlockLength = 0;
-
+                
                 afs.tableOfContents = new AFS_TOC_Entry[afs.numFiles];
 
                 for (var i = 0; i < afs.numFiles; ++i)
                 {
                     var toc_entry = AFS_TOC_Entry.FromStream(stream); 
                     afs.tableOfContents[i] = toc_entry;
-
-                    var multiple = (toc_entry.length / 2048) + 1;
-                    var blockSize = multiple * 2048;
-
-                    dataBlockLength += blockSize; 
                 }
-
                 
-
-                afs.data = new byte[dataBlockLength]; 
-
-                // read all the files 
-                // var dataIndex = 0u; 
-                // for(var i = 0; i < afs.numFiles; ++i)
-                // {
-                //     var entry = afs.tableOfContents[i];
-                // 
-                // 
-                // 
-                //     // var multiple = (entry.length / 2048) + 1;
-                //     // var blockSize = multiple * 2048;
-                //     // 
-                //     // stream.Read(afs.data, (int) dataIndex, (int) blockSize);
-                //     // dataIndex += blockSize;
-                // }
+                afs.filenameDirectoryOffset = BinaryHelper.ReadUInt32(stream);
+                afs.filenameDirectoryLength = BinaryHelper.ReadUInt32(stream);
                 
-
+                afs.files = new AFS_File[afs.numFiles]; 
+                for(var i = 0; i < afs.numFiles; ++i)
+                {
+                    var toc_entry = afs.tableOfContents[i];
+                    var file = AFS_File.FromStream(stream, toc_entry.offset, toc_entry.length);
+                    afs.files[i] = file; 
+                }
+               
                 afs.directory = new AFS_Directory_Entry[afs.numFiles];
-
-
-
+                
+                // hmm 
                 var dataBlockStart = afs.tableOfContents[0].offset;
                 var directoryOffsetStreamStart = dataBlockStart - 8;
                 stream.Position = directoryOffsetStreamStart;
                 stream.Position = BinaryHelper.ReadUInt32(stream);
 
+                // HMMM 
+                // stream.Position = afs.filenameDirectoryOffset;
+
                 for (var i = 0; i < afs.numFiles; ++i)
                 {
                     var toc_entry = afs.tableOfContents[i];
-                    toc_entry.filenameDirectoryOffset = (uint) stream.Position; // reference 
-                    
                     var directory_entry = AFS_Directory_Entry.FromStream(stream);
                     afs.directory[i] = directory_entry;
                 }
@@ -456,19 +462,37 @@ namespace TestApp
                 //     Log($"filenameDirectoryOffset: {toc_entry.filenameDirectoryOffset}");
                 // }
 
-                for (var i = 0; i < archive.directory.Length; ++i)
+                if (!Directory.Exists(output))
+                {
+                    Directory.CreateDirectory(output); 
+                }
+
+                // var sb = new StringBuilder();
+                for (var i = 0; i < archive.numFiles; ++i)
                 {
                     var toc_entry = archive.tableOfContents[i];
                     var directory_entry = archive.directory[i];
-                
-                    if(toc_entry.length != directory_entry.fileLength)
+                    var file = archive.files[i];
+
+                    var fullFilename = string.Format("{0}/{1}", output, directory_entry.filename);
+
+                    using (var writer = File.OpenWrite(fullFilename))
                     {
-                        Log("toc_entry and directory_entry lengths do not match!\r\n");
+                        writer.Write(file.data, 0, file.data.Length); 
                     }
 
-                    Log($"found AFS packed file: name: {directory_entry.filename}\r\n"); 
-                    Log($"with length: {directory_entry.fileLength}\r\n");
+
+                    // if(toc_entry.length != directory_entry.fileLength)
+                    // {
+                    //     Log(string.Format("toc_entry and directory_entry lengths do not match! {0} != {1}"));
+                    // }
+                    
+                    // var message = string.Format("length: {1}  toc_length: {2}", 
+                    //     directory_entry.filename , directory_entry.fileLength, toc_entry.length);
+                    // sb.AppendLine(message);
                 }
+
+                // Log(sb.ToString()); 
             }
         }
 
@@ -664,6 +688,11 @@ namespace TestApp
             }
 
             PatchProgressBar.Value += addProgress;
+        }
+
+        private void OutputText_TextChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }

@@ -11,11 +11,15 @@ namespace TestApp
     {
         public static string ReadString(FileStream stream, int length)
         {
+
+
+
             var buffer = new byte[length];
             stream.Read(buffer, 0, length);
 
             var encoding = Encoding.GetEncoding("shift_jis");
             var result = encoding.GetString(buffer);
+            result = result.Trim('\0'); // remove nulls 
 
             return result; 
         }
