@@ -52,5 +52,5 @@ The files (and archives themselves) for MHG are using SHIFT_JIS encoding. All of
 
 ### Credits:
 - Patcher by Coty: https://twitter.com/cotycrg
-- Translations by Dixdros (Dixdros#0268) and vicious (viciousShadow#5130) (nice job, guys!)
+- Translations by Dixdros and viciousShadow (nice job, guys!)
 - Compression algorithm perfected by the_fog (thanks!)
