@@ -191,19 +191,19 @@ namespace TestApp
                 
                 // uncompress, patch, recompress, reinject into AFS instance 
                 var metadata = new List<TempFileMetadata>();
-
+                
                 // update progress bar 
                 var max_progress = unpackFiles.Count * 3;
                 var cur_progress = 0;
-
+                
                 // uncompress 
                 Log("Decompressing packed files.");
-
+                
                 for(var i = 0; i < unpackFiles.Count; ++i)
                 {
                     UpdateProress(cur_progress, 0, max_progress);
                     cur_progress += 1;
-
+                
                     var unpackFile = unpackFiles[i];
                     var targetFilenameFull = string.Format("{0}/{1}", outputArchiveFolder, unpackFile);
                     var targetFilenameUnpackedFull = $"{targetFilenameFull}.unpacked";
@@ -212,7 +212,7 @@ namespace TestApp
                     meta.originalFilename = targetFilenameFull;
                     meta.unpackedFilename = targetFilenameUnpackedFull;
                     metadata.Add(meta);
-
+                
                     meta.uncompressed = UnpackAFS_File(targetFilenameFull);
                     if (!meta.uncompressed)
                     {
@@ -220,25 +220,24 @@ namespace TestApp
                         continue; 
                     }
                 }
-
+                
                 Log("Patching uncompressed files.");
                 for (var i = 0; i < unpackFiles.Count; ++i)
                 {
                     UpdateProress(cur_progress, 0, max_progress);
                     cur_progress += 1;
-
+                
                     var unpackFile = unpackFiles[i];
                     var meta = metadata[i];
-
+                
                     if (!meta.uncompressed)
                     {
                         continue;
                     }
-
-                    // meta.patched = PatchFile(meta.unpackedFilename, patches);
-                    
+                
+                    meta.patched = PatchFile(meta.unpackedFilename, patches);
                 }
-
+                
                 Log("Recompressing patched files. This may take awhile.");
                 for (var i = 0; i < unpackFiles.Count; ++i)
                 {
@@ -267,7 +266,7 @@ namespace TestApp
                         continue; 
                     }
                 }
-
+                
                 // possibly keep for reference 
                 // note: unless deleted it will get put into the ISO
                 var keepOldArchives = KeepOldArchivesCheckBox.Checked;

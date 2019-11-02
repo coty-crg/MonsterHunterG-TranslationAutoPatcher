@@ -166,12 +166,16 @@ namespace TestApp
                 toc_entry.WriteStream(stream);
             }
 
+            // padding (table of contents is 512 KB)
+            var tableOfContentsSize = padding_size * 256;
+            BinaryHelper.WriteAFSPadding(stream, stream.Position, tableOfContentsSize);
+            
+            // directory information is at the very end of the table of contents block, past the padding
+            stream.Position -= 8; 
+
             BinaryHelper.WriteUInt32(stream, filenameDirectoryOffset);
             BinaryHelper.WriteUInt32(stream, filenameDirectoryLength);
-
-            // padding
-            // BinaryHelper.WriteAFSPadding(stream, stream.Position, padding_size); 
-
+            
             // data (will need to update ToC entry's from here)
             for (var i = 0; i < numFiles; ++i)
             {
