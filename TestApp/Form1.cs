@@ -43,6 +43,7 @@ namespace TestApp
             ImgBurnPathTextBox.Enabled = enable;
             SelectPatchFileButton.Enabled = enable;
             CleanupCheckbox.Enabled = enable; 
+            KeepOldArchivesCheckBox.Enabled = enable;
         }
         
         private class TempFileMetadata
@@ -100,6 +101,37 @@ namespace TestApp
             return patchingFiles;
         }
 
+        private void RecursivelyDeleteDirectory(string directory)
+        {
+            if (!Directory.Exists(directory))
+            {
+                return; 
+            }
+
+            try
+            {
+                var childDirectories = Directory.GetDirectories(directory);
+                foreach(var childDirectory in childDirectories)
+                {
+                    RecursivelyDeleteDirectory(childDirectory); 
+                }
+
+                var files = Directory.GetFiles(directory);
+                foreach(var file in files)
+                {
+                    File.Delete(file);
+                }
+
+                Directory.Delete(directory); 
+            }
+            catch(System.Exception e)
+            {
+                Log(e.StackTrace);
+                Log(e.Message);
+                Log($"Failed to delete {directory}");
+            }
+        }
+
         private void DoApplyPatchISO(string inputFile, string outputFile, string patchData)
         {
             var patches = GetPatches(patchData);
@@ -108,17 +140,10 @@ namespace TestApp
 
             var tempFolder = "./temp";
             var tempFolderAFS = "./tempAFS";
-            
-            // cleanup previous work 
-            if (Directory.Exists(tempFolder))
-            {
-                Directory.Delete(tempFolder, true);
-            }
 
-            if (Directory.Exists(tempFolderAFS))
-            {
-                Directory.Delete(tempFolderAFS, true);
-            }
+            // cleanup previous work 
+            RecursivelyDeleteDirectory(tempFolder);
+            RecursivelyDeleteDirectory(tempFolderAFS);
 
             // prepare directories 
             Directory.CreateDirectory(tempFolder);
@@ -210,63 +235,62 @@ namespace TestApp
                         continue;
                     }
 
-                    meta.patched = PatchFile(meta.unpackedFilename, patches);
+                    // meta.patched = PatchFile(meta.unpackedFilename, patches);
                     
                 }
 
                 Log("Recompressing patched files. This may take awhile.");
-                for (var i = 0; i < unpackFiles.Count; ++i)
+                // for (var i = 0; i < unpackFiles.Count; ++i)
+                // {
+                //     UpdateProress(cur_progress, 0, max_progress);
+                //     cur_progress += 1;
+                // 
+                //     var unpackFile = unpackFiles[i];
+                //     var meta = metadata[i];
+                // 
+                //     if (!meta.uncompressed || !meta.patched)
+                //     {
+                //         continue;
+                //     }
+                //     
+                //     meta.recompressed = RepackAFS_File(meta.originalFilename, meta.unpackedFilename);
+                //     if (!meta.recompressed)
+                //     {
+                //         Log($"Failed to recompressed {meta.originalFilename}! Did crappack fail?");
+                //         continue;
+                //     }
+                // 
+                //     meta.reinjected = ReinjectInAFS(archive, meta.originalFilename);
+                //     if (!meta.reinjected)
+                //     {
+                //         Log($"Failed to reinject {meta.originalFilename}");
+                //         continue; 
+                //     }
+                // }
+
+                // possibly keep for reference 
+                // note: unless deleted it will get put into the ISO
+                var keepOldArchives = KeepOldArchivesCheckBox.Checked;
+                if (keepOldArchives)
                 {
-                    UpdateProress(cur_progress, 0, max_progress);
-                    cur_progress += 1;
-
-                    var unpackFile = unpackFiles[i];
-                    var meta = metadata[i];
-
-                    if (!meta.uncompressed || !meta.patched)
-                    {
-                        continue;
-                    }
-                    
-                    meta.recompressed = RepackAFS_File(meta.originalFilename, meta.unpackedFilename);
-                    if (!meta.recompressed)
-                    {
-                        Log($"Failed to recompressed {meta.originalFilename}! Did crappack fail?");
-                        continue;
-                    }
-
-                    meta.reinjected = ReinjectInAFS(archive, meta.originalFilename);
-                    if (!meta.reinjected)
-                    {
-                        Log($"Failed to reinject {meta.originalFilename}");
-                        continue; 
-                    }
+                    Log("Cloning previous AFS.");
+                    CloneOldAFS(inputArchiveFile); 
                 }
-
-                Log("Cloning previous AFS.");
-                CloneOldAFS(inputArchiveFile); // for reference (note: unless deleted it will get put into the ISO) 
-
+                
                 Log("Rebuilding fresh AFS.");
                 RebuildAFS(archive, inputArchiveFile); // rebuilds from scratch, using the modified instance 
             }
+            
+            Log("Rebuilding fresh ISO.");
+            RepackISO(tempFolder, outputFile, volumeLabel); 
 
             // if checked, delete all the temp stuff we made
             var cleanup = CleanupCheckbox.Checked;
             if (cleanup)
             {
-                if (Directory.Exists(tempFolder))
-                {
-                    Directory.Delete(tempFolder, true); 
-                }
-
-                if (Directory.Exists(tempFolderAFS))
-                {
-                    Directory.Delete(tempFolderAFS, true);
-                }
+                RecursivelyDeleteDirectory(tempFolder);
+                RecursivelyDeleteDirectory(tempFolderAFS);
             }
-
-            Log("Rebuilding fresh ISO.");
-            RepackISO(tempFolder, outputFile, volumeLabel); 
         }
         
         private void ExtractISO(string inputFile, string outputFolder, out string volumeLabel)
