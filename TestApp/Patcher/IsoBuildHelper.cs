@@ -1,6 +1,7 @@
 ﻿using IMAPI2.Interop;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
@@ -86,6 +87,13 @@ namespace TestApp
         // imgburn command line 
         public static void ImgBurnCreateISO(string imgBurnPath, string volumeName, string directoryPath, string outputFile)
         {
+            // imgburn doesn't seem to overwrite existing, even though we have /OVERWRITE YES passed in
+            // so, just do it ourselves 
+            if (File.Exists(outputFile))
+            {
+                File.Delete(outputFile); 
+            }
+
             directoryPath = directoryPath.Replace('/', '\\');
             outputFile = outputFile.Replace('/', '\\');
             

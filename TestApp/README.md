@@ -36,8 +36,8 @@ I had to figure out the AFS format. Here's what I discovered..
     - Directory's offset (4 bytes, uint32)
     - Directory's length (4 bytes, uint32)
   - Data (this is another list, size equaling the numer of files above, containing the files themselves)
-    - Note: The data is padded to the nearest 2048th byte with 0s.
-  - File Directory (this is another list, size equaling the number of files above. After the last file, it is also padded to the nearest 2048th byte)
+    - Note: The data is padded to the nearest 2048th byte with 0s PER FILE.
+  - File Directory (this is another list, size equaling the number of files above. After the last file, it is also padded to the nearest 2048th byte AT THE END OF THE WHOLE DIRECTORY)
     - Filename (32 bytes, terminated and padded with 0s)
     - Year (2 bytes, uint16)
     - Month (2 bytes, uint16)
