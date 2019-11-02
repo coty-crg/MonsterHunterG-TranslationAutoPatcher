@@ -15,56 +15,7 @@ namespace TestApp
         {
             InitializeComponent();
         }
-
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
-
-        private void folderBrowserDialog1_HelpRequest(object sender, EventArgs e)
-        {
-
-        }
-
-        private void folderBrowserDialog1_HelpRequest_1(object sender, EventArgs e)
-        {
-            
-        }
-
-        private void button1_Click(object sender, EventArgs e)
-        {
-            OpenISODialog.DefaultExt = ".iso";
-            OpenISODialog.FileName = "original.iso";
-            OpenISODialog.Filter = "ISO file (*.iso)|*.iso";
-
-            OpenISODialog.ShowDialog();
-
-            var path = OpenISODialog.FileName;
-            SelectISOText.Text = path;
-
-            TryEnableApplyButton();
-        }
-
-        private void SelectFolderText_TextChanged(object sender, EventArgs e)
-        {
-
-        }
-
-        private void OutputFileButton_Click(object sender, EventArgs e)
-        {
-            OutputFileDialog.AddExtension = true;
-            OutputFileDialog.DefaultExt = ".iso";
-            OutputFileDialog.FileName = "patched.iso";
-            OutputFileDialog.Filter = "ISO file (*.iso)|*.iso";
-
-            OutputFileDialog.ShowDialog();
-
-            var path = OutputFileDialog.FileName;
-            OutputFileText.Text = path;
-
-            TryEnableApplyButton(); 
-        }
-
+        
         private void TryEnableApplyButton()
         {
             var input = SelectISOText.Text; 
@@ -76,65 +27,6 @@ namespace TestApp
                 && !string.IsNullOrEmpty(patchData);
 
             ApplyPatchButton.Enabled = ready; 
-        }
-
-        private void PatchProgressBar_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void ApplyPatchButton_Click(object sender, EventArgs e)
-        {
-            var inputFile = SelectISOText.Text;
-            var outputPath = OutputFileText.Text;
-            var patchData = PatchFileData.Text;
-
-            // todo 
-            // skip first line, its the header info 
-            PatchProgressBar.Minimum = 0;
-            PatchProgressBar.Maximum = patchData.Split('\n').Length; // * AddFileCounter(inputFile);
-
-            OutputFileButton.Enabled = false;
-            SelectFolderButton.Enabled = false; 
-            ApplyPatchButton.Enabled = false;
-
-            PatchProgressBar.Value = 0; 
-
-            var thread = new System.Threading.Thread(() =>
-            {
-                Log("Starting..");
-
-                    DoApplyPatchISO(inputFile, outputPath, patchData);
-
-
-                Log("Finished.");
-                
-                // run on main thread 
-                this.Invoke(new Action(() =>
-                {
-                    ApplyPatchButton.Enabled = true;
-                    OutputFileButton.Enabled = true;
-                    SelectFolderButton.Enabled = true;
-                    PatchProgressBar.Value = PatchProgressBar.Maximum; 
-                }));
-            });
-
-            thread.Start();
-        }
-
-        private void SelectPatchFileButton_Click(object sender, EventArgs e)
-        {
-            SelectPatchFileDialog.DefaultExt = ".csv";
-            SelectPatchFileDialog.FileName = "patch.csv";
-            SelectPatchFileDialog.Filter = "Patch File (*.csv)|*.csv";
-
-            SelectPatchFileDialog.ShowDialog();
-
-            var patchFilePath = SelectPatchFileDialog.FileName;
-            var patchData = System.IO.File.ReadAllText(patchFilePath);
-            PatchFileData.Text = patchData;
-
-            TryEnableApplyButton(); 
         }
         
         private void DoApplyPatchISO(string inputFile, string outputFile, string patchData)
@@ -155,57 +47,52 @@ namespace TestApp
             {
                 Directory.CreateDirectory(tempFolderAFS);
             }
+            
+            var volumeLabel = string.Empty;
+            ExtractISO(inputFile, tempFolder, out volumeLabel);
+            volumeLabel += "_PATCHED";
 
-            //BootDeviceEmulation bootEmulation;
-            Stream bootImageStream;
-            int bootLoadSegment;
-            string volumeLabel;
-
-            ExtractISO(inputFile, tempFolder, out bootImageStream, out bootLoadSegment, out volumeLabel);
-
-
-
-            var files = new List<string>() { "AFS_DATA.AFS" }; 
-            foreach(var file in files)
+            // which archive files contain the bin files we care about? 
+            var patchingFiles = new Dictionary<string, List<string>>();
+            patchingFiles.Add("AFS_DATA.AFS", new List<string>() { "sub_main.bin" });
+            
+            foreach(var entry in patchingFiles)
             {
+                var unpackAFS = entry.Key;
+                var unpackFiles = entry.Value;
 
-                var inputDataFile = string.Format("{0}/{1}", tempFolder, file);
-                var outputDataFolder = string.Format("{0}/{1}", tempFolderAFS, file);
+                var inputDataFile = string.Format("{0}/{1}", tempFolder, unpackAFS);
+                var outputDataFolder = string.Format("{0}/{1}", tempFolderAFS, unpackAFS);
+
                 var archive = ExtractFromAFS(inputDataFile, outputDataFolder);
 
-                var targetFilename = "sub_main.bin";
-                var targetFilenameFull = string.Format("{0}/{1}", outputDataFolder, targetFilename);
-                UnpackAFS_File(targetFilenameFull);
+                foreach (var unpackFile in unpackFiles)
+                {
+                    var targetFilenameFull = string.Format("{0}/{1}", outputDataFolder, unpackFile);
+                    var targetFilenameUnpackedFull = $"{targetFilenameFull}.unpacked";
 
-                PatchFile($"{targetFilenameFull}.unpacked", patches); 
+                    UnpackAFS_File(targetFilenameFull);
+                    PatchFile(targetFilenameUnpackedFull, patches);
+                    RepackAFS_File(targetFilenameFull, targetFilenameUnpackedFull);
+                    ReinjectInAFS(archive, targetFilenameFull);
+                }
 
-                RepackAFS_File(targetFilenameFull);
-
-                // todo: reinject AFS file
-                var outputDataFile = string.Format("{0}/{1}.patched", tempFolder, file);
-                ReinjectInAFS(archive, targetFilenameFull, outputDataFile);
-                RebuildAFS(archive, outputDataFile); 
+                CloneOldAFS(inputDataFile); 
+                RebuildAFS(archive, inputDataFile);
             }
             
-            // todo: repack AFS into ISO 
-
-            // RepackISO(tempFolder, outputFile, bootImageStream, bootLoadSegment, volumeLabel); 
+            RepackISO(tempFolder, outputFile, volumeLabel); 
         }
         
-        private void ExtractISO(string inputFile, string outputFolder, out Stream bootImageStream, out int bootLoadSegment,
-            out string volumeLabel)
+        private void ExtractISO(string inputFile, string outputFolder, out string volumeLabel)
         {
             using (FileStream isoStream = File.Open(inputFile, FileMode.Open))
             {
-                
                 var reader_cd = new CDReader(isoStream, true, true);
 
                 volumeLabel = reader_cd.VolumeLabel;
-                bootLoadSegment = reader_cd.BootLoadSegment;
-                bootImageStream = null;
-
-
-                // reader_cd.Root
+                // bootLoadSegment = reader_cd.BootLoadSegment;
+                // bootImageStream = null;
 
                 ExtractISO_Directory(reader_cd, outputFolder, reader_cd.Root.FullName);
             }
@@ -254,27 +141,38 @@ namespace TestApp
             }
         }
 
-        private void RepackISO(string inputFolder, string outputFile, Stream bootImageStream, int bootLoadSegment,
-            string volumeLabel)
+        private void RepackISO(string inputFolder, string outputFile, string volumeLabel)
         {
-            var writer_cd = new DiscUtils.Iso9660.CDBuilder();
-            writer_cd.UseJoliet = true;
-            writer_cd.UpdateIsolinuxBootTable = true; 
-            writer_cd.VolumeIdentifier = volumeLabel;
+            Log($"Rebuilding ISO with ImgBurn: ISO9660 + UDF. " +
+                $"Volume Label: {volumeLabel}, input folder: {inputFolder}, output file: {outputFile}");
 
-            // repack boot image 
-            if (bootImageStream != null)
-            {
-                Log("writing boot image"); 
-                writer_cd.SetBootImage(bootImageStream, BootDeviceEmulation.NoEmulation, bootLoadSegment); 
-            }
+            var imgBurnPath = ImgBurnPathTextBox.Text;
+            IsoBuildHelper.ImgBurnCreateISO(imgBurnPath, volumeLabel, inputFolder, outputFile);
 
-            // repack files 
-            RepackISO_Directory(writer_cd, inputFolder, inputFolder);
-            
-            // save to disk 
-            var stream = new FileStream(outputFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite); 
-            writer_cd.Build(stream);
+            Log($"Finished rebulding ISO: {outputFile}");
+
+            // PS2 doesnt read this ISO 
+            // IsoBuildHelper.CreateISOImage(volumeLabel, inputFolder, outputFile);
+
+            // PS2 doesn't read this ISO 
+            // var writer_cd = new DiscUtils.Iso9660.CDBuilder();
+            // writer_cd.UseJoliet = true;
+            // writer_cd.UpdateIsolinuxBootTable = true; 
+            // writer_cd.VolumeIdentifier = volumeLabel;
+            // 
+            // // repack boot image 
+            // if (bootImageStream != null)
+            // {
+            //     Log("writing boot image"); 
+            //     writer_cd.SetBootImage(bootImageStream, BootDeviceEmulation.NoEmulation, bootLoadSegment); 
+            // }
+            // 
+            // // repack files 
+            // RepackISO_Directory(writer_cd, inputFolder, inputFolder);
+            // 
+            // // save to disk 
+            // var stream = new FileStream(outputFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite); 
+            // writer_cd.Build(stream);
         }
 
         private void RepackISO_Directory(CDBuilder cd, string rootFolder, string inputFolder)
@@ -309,227 +207,21 @@ namespace TestApp
             }
         }
         
-        private class AFS_TOC_Entry
-        {
-            public uint offset;
-            public uint length;
-
-            public static AFS_TOC_Entry FromStream(FileStream stream)
-            {
-                var entry = new AFS_TOC_Entry();
-
-                entry.offset = BinaryHelper.ReadUInt32(stream);
-                entry.length = BinaryHelper.ReadUInt32(stream);
-
-                return entry;
-            }
-
-            public void WriteStream(FileStream stream)
-            {
-                BinaryHelper.WriteUInt32(stream, offset);
-                BinaryHelper.WriteUInt32(stream, length);
-            }
-        }
-
-        private class AFS_Directory_Entry
-        {
-            public string filename; // 32 bytes
-            public ushort year;
-            public ushort month;
-            public ushort day;
-            public ushort hour;
-            public ushort minute;
-            public ushort second;
-            public uint fileLength;
-            
-            public static AFS_Directory_Entry FromStream(FileStream stream)
-            {
-                var entry = new AFS_Directory_Entry();
-
-                entry.filename = BinaryHelper.ReadString(stream, 32);
-                entry.year = BinaryHelper.ReadUInt16(stream);
-                entry.month = BinaryHelper.ReadUInt16(stream);
-                entry.day = BinaryHelper.ReadUInt16(stream);
-                entry.hour = BinaryHelper.ReadUInt16(stream);
-                entry.minute = BinaryHelper.ReadUInt16(stream);
-                entry.second = BinaryHelper.ReadUInt16(stream);
-                entry.fileLength = BinaryHelper.ReadUInt32(stream);
-
-                return entry;
-            }
-
-            public void WriteStream(FileStream stream)
-            {
-                BinaryHelper.WriteString(stream, filename, 32);
-                BinaryHelper.WriteUInt16(stream, year);
-                BinaryHelper.WriteUInt16(stream, month);
-                BinaryHelper.WriteUInt16(stream, day);
-                BinaryHelper.WriteUInt16(stream, hour);
-                BinaryHelper.WriteUInt16(stream, minute);
-                BinaryHelper.WriteUInt16(stream, second);
-                BinaryHelper.WriteUInt32(stream, fileLength); 
-            }
-        }
-
-        private class AFS_File
-        {
-            public byte[] data; 
-
-            public static AFS_File FromStream(FileStream stream, uint offset, uint length)
-            {
-                var file = new AFS_File();
-                file.data = new byte[length];
-
-                stream.Position = offset; 
-                stream.Read(file.data, 0, (int) length);
-
-                return file; 
-            }
-
-            public void WriteStream(FileStream stream)
-            {
-                stream.Write(data, 0, data.Length);
-            }
-        }
-
-        private class AFS
-        {
-            public string header;
-            public uint numFiles;
-
-            public AFS_TOC_Entry[] tableOfContents;
-
-            public uint filenameDirectoryOffset;
-            public uint filenameDirectoryLength;
-            
-            public AFS_File[] files;
-            public AFS_Directory_Entry[] directory;
-            
-            public static AFS FromStream(FileStream stream)
-            {
-                var afs = new AFS();
-
-                afs.header = BinaryHelper.ReadString(stream, 4);
-                afs.numFiles = BinaryHelper.ReadUInt32(stream);
-                
-                afs.tableOfContents = new AFS_TOC_Entry[afs.numFiles];
-
-                for (var i = 0; i < afs.numFiles; ++i)
-                {
-                    var toc_entry = AFS_TOC_Entry.FromStream(stream); 
-                    afs.tableOfContents[i] = toc_entry;
-                }
-                
-                afs.filenameDirectoryOffset = BinaryHelper.ReadUInt32(stream);
-                afs.filenameDirectoryLength = BinaryHelper.ReadUInt32(stream);
-                
-                afs.files = new AFS_File[afs.numFiles]; 
-                for(var i = 0; i < afs.numFiles; ++i)
-                {
-                    var toc_entry = afs.tableOfContents[i];
-                    var file = AFS_File.FromStream(stream, toc_entry.offset, toc_entry.length);
-                    afs.files[i] = file; 
-                }
-               
-                afs.directory = new AFS_Directory_Entry[afs.numFiles];
-                
-                // hmm 
-                var dataBlockStart = afs.tableOfContents[0].offset;
-                var directoryOffsetStreamStart = dataBlockStart - 8;
-                stream.Position = directoryOffsetStreamStart;
-                stream.Position = BinaryHelper.ReadUInt32(stream);
-
-                // HMMM 
-                // stream.Position = afs.filenameDirectoryOffset;
-
-                for (var i = 0; i < afs.numFiles; ++i)
-                {
-                    var toc_entry = afs.tableOfContents[i];
-                    var directory_entry = AFS_Directory_Entry.FromStream(stream);
-                    afs.directory[i] = directory_entry;
-                }
-
-                return afs; 
-            }
-
-            public void WriteStream(FileStream stream)
-            {
-                var padding_size = 2048;
-
-                // header 
-                BinaryHelper.WriteString(stream, header, 4);
-                BinaryHelper.WriteUInt32(stream, numFiles);
-
-                // table of contents 
-                for(var i = 0; i < numFiles; ++i)
-                {
-                    var toc_entry = tableOfContents[i];
-                    toc_entry.WriteStream(stream); 
-                }
-
-                BinaryHelper.WriteUInt32(stream, filenameDirectoryOffset);
-                BinaryHelper.WriteUInt32(stream, filenameDirectoryLength);
-
-                // padding
-                // BinaryHelper.WriteAFSPadding(stream, stream.Position, padding_size); 
-
-                // data (will need to update ToC entry's from here)
-                for (var i = 0; i < numFiles; ++i)
-                {
-                    var toc_entry = tableOfContents[i];
-                    toc_entry.offset = (uint) stream.Position; 
-                    
-                    var afs_file = files[i];
-                    afs_file.WriteStream(stream);
-
-                    // padding 
-                    BinaryHelper.WriteAFSPadding(stream, stream.Position, padding_size);
-                }
-
-                filenameDirectoryOffset = (uint) stream.Position;
-
-                // directory 
-                for (var i = 0; i < numFiles; ++i)
-                {
-                    var dir_entry = directory[i];
-                    dir_entry.WriteStream(stream); 
-                }
-
-                filenameDirectoryLength = (uint) (stream.Position - filenameDirectoryOffset);
-
-                // padding 
-                BinaryHelper.WriteAFSPadding(stream, stream.Position, padding_size);
-                
-                // go back and re-write the table of contents, with the updated information 
-                stream.Position = 8; // header = 4, numfiles = 4
-
-                // table of contents 
-                for (var i = 0; i < numFiles; ++i)
-                {
-                    var toc_entry = tableOfContents[i];
-                    toc_entry.WriteStream(stream);
-                }
-
-                BinaryHelper.WriteUInt32(stream, filenameDirectoryOffset);
-                BinaryHelper.WriteUInt32(stream, filenameDirectoryLength);
-            }
-        }
-        
         private AFS ExtractFromAFS(string input, string output)
         {
             using (var reader = File.OpenRead(input))
             {
                 var archive = AFS.FromStream(reader);
 
-                Log($"header: {archive.header}\r\n"); 
-                Log($"numFiles: {archive.numFiles}\r\n");
+                Log($"Extracted AFS!");
+                Log($"header: {archive.header}"); 
+                Log($"numFiles: {archive.numFiles}");
 
                 if (!Directory.Exists(output))
                 {
                     Directory.CreateDirectory(output); 
                 }
-
-                // var sb = new StringBuilder();
+                
                 for (var i = 0; i < archive.numFiles; ++i)
                 {
                     var toc_entry = archive.tableOfContents[i];
@@ -542,19 +234,13 @@ namespace TestApp
                     {
                         writer.Write(file.data, 0, file.data.Length); 
                     }
-                    
-                    // var message = string.Format("{0} | length: {1}, toc_length: {2}", 
-                    //     directory_entry.filename , directory_entry.fileLength, toc_entry.length);
-                    // Log(message);
                 }
 
                 return archive;
             }
-
-            return null; 
         }
         
-        private void ReinjectInAFS(AFS afs, string input_file, string output_afs)
+        private void ReinjectInAFS(AFS afs, string input_file)
         {
             var shortFilename = input_file;
             while (shortFilename.IndexOf('/') >= 0)
@@ -595,6 +281,18 @@ namespace TestApp
             
         }
 
+        private void CloneOldAFS(string input)
+        {
+            var copyName = $"{input}.old";
+
+            if (File.Exists(copyName))
+            {
+                File.Delete(copyName);
+            }
+
+            File.Copy(input, copyName); 
+        }
+
         private void RebuildAFS(AFS afs, string output_afs)
         {
             Log("Saving AFS.");
@@ -611,23 +309,33 @@ namespace TestApp
         private void UnpackAFS_File(string input)
         {
             var command = $"crappack-cmd.py -u {input}";
-
             Log("python.exe " + command);
 
-            var process = System.Diagnostics.Process.Start("python.exe", command);
+            System.Diagnostics.Process process = new System.Diagnostics.Process();
+            System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
+            startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+            startInfo.FileName = "python.exe";
+            startInfo.Arguments = command;
+            process.StartInfo = startInfo;
+            process.Start();
             process.WaitForExit();
         }
 
-        private void RepackAFS_File(string input)
+        private void RepackAFS_File(string inputPacked, string inputUnpacked)
         {
-            var original = input;
-            var unpacked = $"{input}.unpacked";
+            var original = inputPacked;
+            var unpacked = inputUnpacked;
 
             var command = $"crappack-cmd.py -p {unpacked} -o {original}";
-
             Log("python.exe " + command);
-
-            var process = System.Diagnostics.Process.Start("python.exe", command);
+            
+            System.Diagnostics.Process process = new System.Diagnostics.Process();
+            System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
+            startInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
+            startInfo.FileName = "python.exe";
+            startInfo.Arguments = command;
+            process.StartInfo = startInfo;
+            process.Start();
             process.WaitForExit();
         }
 
@@ -836,7 +544,121 @@ namespace TestApp
             PatchProgressBar.Value += addProgress;
         }
 
+        // events 
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void folderBrowserDialog1_HelpRequest(object sender, EventArgs e)
+        {
+
+        }
+
+        private void folderBrowserDialog1_HelpRequest_1(object sender, EventArgs e)
+        {
+
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            OpenISODialog.DefaultExt = ".iso";
+            OpenISODialog.FileName = "original.iso";
+            OpenISODialog.Filter = "ISO file (*.iso)|*.iso";
+
+            OpenISODialog.ShowDialog();
+
+            var path = OpenISODialog.FileName;
+            SelectISOText.Text = path;
+
+            TryEnableApplyButton();
+        }
+
+        private void SelectFolderText_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void OutputFileButton_Click(object sender, EventArgs e)
+        {
+            OutputFileDialog.AddExtension = true;
+            OutputFileDialog.DefaultExt = ".iso";
+            OutputFileDialog.FileName = "patched.iso";
+            OutputFileDialog.Filter = "ISO file (*.iso)|*.iso";
+
+            OutputFileDialog.ShowDialog();
+
+            var path = OutputFileDialog.FileName;
+            OutputFileText.Text = path;
+
+            TryEnableApplyButton();
+        }
+
+        private void PatchProgressBar_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void ApplyPatchButton_Click(object sender, EventArgs e)
+        {
+            var inputFile = SelectISOText.Text;
+            var outputPath = OutputFileText.Text;
+            var patchData = PatchFileData.Text;
+
+            // todo 
+            // skip first line, its the header info 
+            PatchProgressBar.Minimum = 0;
+            PatchProgressBar.Maximum = patchData.Split('\n').Length; // * AddFileCounter(inputFile);
+
+            OutputFileButton.Enabled = false;
+            SelectFolderButton.Enabled = false;
+            ApplyPatchButton.Enabled = false;
+
+            PatchProgressBar.Value = 0;
+
+            var thread = new System.Threading.Thread(() =>
+            {
+                Log("Starting..");
+
+                DoApplyPatchISO(inputFile, outputPath, patchData);
+
+
+                Log("Finished.");
+
+                // run on main thread 
+                this.Invoke(new Action(() =>
+                {
+                    ApplyPatchButton.Enabled = true;
+                    OutputFileButton.Enabled = true;
+                    SelectFolderButton.Enabled = true;
+                    PatchProgressBar.Value = PatchProgressBar.Maximum;
+                }));
+            });
+
+            thread.Start();
+        }
+
+        private void SelectPatchFileButton_Click(object sender, EventArgs e)
+        {
+            SelectPatchFileDialog.DefaultExt = ".csv";
+            SelectPatchFileDialog.FileName = "patch.csv";
+            SelectPatchFileDialog.Filter = "Patch File (*.csv)|*.csv";
+
+            SelectPatchFileDialog.ShowDialog();
+
+            var patchFilePath = SelectPatchFileDialog.FileName;
+            var patchData = System.IO.File.ReadAllText(patchFilePath);
+            PatchFileData.Text = patchData;
+
+            TryEnableApplyButton();
+        }
+
         private void OutputText_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void label1_Click(object sender, EventArgs e)
         {
 
         }
