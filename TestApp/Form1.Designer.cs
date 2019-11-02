@@ -44,6 +44,9 @@
             this.label1 = new System.Windows.Forms.Label();
             this.ImgBurnPathTextBox = new System.Windows.Forms.TextBox();
             this.LogLabel = new System.Windows.Forms.Label();
+            this.ArchiveListTextBox = new System.Windows.Forms.TextBox();
+            this.AFSFileLabel = new System.Windows.Forms.Label();
+            this.label2 = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // SelectFolderButton
@@ -52,7 +55,7 @@
             this.SelectFolderButton.Name = "SelectFolderButton";
             this.SelectFolderButton.Size = new System.Drawing.Size(145, 57);
             this.SelectFolderButton.TabIndex = 0;
-            this.SelectFolderButton.Text = "Select Input Folder";
+            this.SelectFolderButton.Text = "Select Input ISO";
             this.SelectFolderButton.UseVisualStyleBackColor = true;
             this.SelectFolderButton.Click += new System.EventHandler(this.button1_Click);
             // 
@@ -82,7 +85,7 @@
             this.OutputFileButton.Name = "OutputFileButton";
             this.OutputFileButton.Size = new System.Drawing.Size(144, 57);
             this.OutputFileButton.TabIndex = 3;
-            this.OutputFileButton.Text = "Select Output File";
+            this.OutputFileButton.Text = "Select Output ISO";
             this.OutputFileButton.UseVisualStyleBackColor = true;
             this.OutputFileButton.Click += new System.EventHandler(this.OutputFileButton_Click);
             // 
@@ -99,12 +102,13 @@
             // 
             // ApplyPatchButton
             // 
+            this.ApplyPatchButton.AutoSize = true;
             this.ApplyPatchButton.Enabled = false;
-            this.ApplyPatchButton.Location = new System.Drawing.Point(14, 203);
+            this.ApplyPatchButton.Location = new System.Drawing.Point(14, 271);
             this.ApplyPatchButton.Name = "ApplyPatchButton";
-            this.ApplyPatchButton.Size = new System.Drawing.Size(292, 121);
+            this.ApplyPatchButton.Size = new System.Drawing.Size(292, 57);
             this.ApplyPatchButton.TabIndex = 5;
-            this.ApplyPatchButton.Text = "Apply Patch";
+            this.ApplyPatchButton.Text = "PATCH";
             this.ApplyPatchButton.UseVisualStyleBackColor = true;
             this.ApplyPatchButton.Click += new System.EventHandler(this.ApplyPatchButton_Click);
             // 
@@ -114,7 +118,7 @@
             this.SelectPatchFileButton.Name = "SelectPatchFileButton";
             this.SelectPatchFileButton.Size = new System.Drawing.Size(142, 57);
             this.SelectPatchFileButton.TabIndex = 7;
-            this.SelectPatchFileButton.Text = "Select Patch File";
+            this.SelectPatchFileButton.Text = "Select Patch File (*.csv)";
             this.SelectPatchFileButton.UseVisualStyleBackColor = true;
             this.SelectPatchFileButton.Click += new System.EventHandler(this.SelectPatchFileButton_Click);
             // 
@@ -134,12 +138,12 @@
             // 
             // OutputText
             // 
-            this.OutputText.Enabled = false;
             this.OutputText.Location = new System.Drawing.Point(14, 347);
             this.OutputText.Multiline = true;
             this.OutputText.Name = "OutputText";
+            this.OutputText.ReadOnly = true;
             this.OutputText.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.OutputText.Size = new System.Drawing.Size(292, 137);
+            this.OutputText.Size = new System.Drawing.Size(292, 121);
             this.OutputText.TabIndex = 9;
             this.OutputText.TextChanged += new System.EventHandler(this.OutputText_TextChanged);
             // 
@@ -168,17 +172,48 @@
             // LogLabel
             // 
             this.LogLabel.AutoSize = true;
-            this.LogLabel.Location = new System.Drawing.Point(17, 331);
+            this.LogLabel.Location = new System.Drawing.Point(14, 331);
             this.LogLabel.Name = "LogLabel";
             this.LogLabel.Size = new System.Drawing.Size(54, 13);
             this.LogLabel.TabIndex = 12;
             this.LogLabel.Text = "output log";
+            // 
+            // ArchiveListTextBox
+            // 
+            this.ArchiveListTextBox.Location = new System.Drawing.Point(14, 216);
+            this.ArchiveListTextBox.Multiline = true;
+            this.ArchiveListTextBox.Name = "ArchiveListTextBox";
+            this.ArchiveListTextBox.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.ArchiveListTextBox.Size = new System.Drawing.Size(292, 49);
+            this.ArchiveListTextBox.TabIndex = 13;
+            this.ArchiveListTextBox.Text = "AFS_DATA.AFS";
+            // 
+            // AFSFileLabel
+            // 
+            this.AFSFileLabel.AutoSize = true;
+            this.AFSFileLabel.Location = new System.Drawing.Point(17, 200);
+            this.AFSFileLabel.Name = "AFSFileLabel";
+            this.AFSFileLabel.Size = new System.Drawing.Size(196, 13);
+            this.AFSFileLabel.TabIndex = 14;
+            this.AFSFileLabel.Text = "Archives (comma separated, no spaces)";
+            // 
+            // label2
+            // 
+            this.label2.AutoSize = true;
+            this.label2.Location = new System.Drawing.Point(17, 471);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(92, 13);
+            this.label2.TabIndex = 15;
+            this.label2.Text = "Patching progress";
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(324, 521);
+            this.Controls.Add(this.label2);
+            this.Controls.Add(this.AFSFileLabel);
+            this.Controls.Add(this.ArchiveListTextBox);
             this.Controls.Add(this.LogLabel);
             this.Controls.Add(this.ImgBurnPathTextBox);
             this.Controls.Add(this.label1);
@@ -221,6 +256,9 @@
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.TextBox ImgBurnPathTextBox;
         private System.Windows.Forms.Label LogLabel;
+        private System.Windows.Forms.TextBox ArchiveListTextBox;
+        private System.Windows.Forms.Label AFSFileLabel;
+        private System.Windows.Forms.Label label2;
     }
 }
 

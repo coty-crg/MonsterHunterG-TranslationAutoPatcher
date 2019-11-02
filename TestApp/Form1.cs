@@ -21,10 +21,14 @@ namespace TestApp
             var input = SelectISOText.Text; 
             var output = OutputFileText.Text;
             var patchData = PatchFileData.Text;
+            var imgBurnPath = ImgBurnPathTextBox.Text;
+            var archiveList = ArchiveListTextBox.Text;
 
             var ready = !string.IsNullOrEmpty(input) 
                 && !string.IsNullOrEmpty(output) 
-                && !string.IsNullOrEmpty(patchData);
+                && !string.IsNullOrEmpty(patchData)
+                && !string.IsNullOrEmpty(imgBurnPath)
+                && !string.IsNullOrEmpty(archiveList);
 
             ApplyPatchButton.Enabled = ready; 
         }
@@ -37,9 +41,10 @@ namespace TestApp
             public bool uncompressed;
             public bool patched;
             public bool recompressed; 
+            public bool reinjected;
         }
 
-        private void DoApplyPatchISO(string inputFile, string outputFile, string patchData)
+        private void DoApplyPatchISO(string inputFile, string outputFile, string patchData, string archiveData)
         {
             var patches = GetPatches(patchData);
 
@@ -64,7 +69,18 @@ namespace TestApp
 
             // which archive files contain the bin files we care about? 
             var patchingFiles = new Dictionary<string, List<string>>();
-            patchingFiles.Add("AFS_DATA.AFS", new List<string>() { ".bin" });
+
+            var archives = archiveData.Split(',');
+            foreach(var archive in archives)
+            {
+                var fileList = new List<string>();
+                fileList.Add("sub_main.bin"); 
+
+                patchingFiles.Add(archive, fileList);
+            }
+
+            // previously hard coded 
+            //patchingFiles.Add("AFS_DATA.AFS", new List<string>() { ".bin" });
             
             foreach(var entry in patchingFiles)
             {
@@ -100,8 +116,10 @@ namespace TestApp
                 // update progress bar 
                 var max_progress = unpackFiles.Count * 3;
                 var cur_progress = 0;
-                
+
                 // uncompress 
+                Log("Decompressing packed files.");
+
                 for(var i = 0; i < unpackFiles.Count; ++i)
                 {
                     UpdateProress(cur_progress, 0, max_progress);
@@ -116,16 +134,15 @@ namespace TestApp
                     meta.unpackedFilename = targetFilenameUnpackedFull;
                     metadata.Add(meta);
 
-                    var unpacked = UnpackAFS_File(targetFilenameFull);
-                    if (!unpacked)
+                    meta.uncompressed = UnpackAFS_File(targetFilenameFull);
+                    if (!meta.uncompressed)
                     {
                         Log($"Failed to uncompress {targetFilenameFull}! Did crappack fail?");
-                        continue;
+                        continue; 
                     }
-                    
-                    meta.uncompressed = true;
                 }
 
+                Log("Patching uncompressed files.");
                 for (var i = 0; i < unpackFiles.Count; ++i)
                 {
                     UpdateProress(cur_progress, 0, max_progress);
@@ -140,8 +157,10 @@ namespace TestApp
                     }
 
                     meta.patched = PatchFile(meta.unpackedFilename, patches);
+                    
                 }
 
+                Log("Recompressing patched files. This may take awhile.");
                 for (var i = 0; i < unpackFiles.Count; ++i)
                 {
                     UpdateProress(cur_progress, 0, max_progress);
@@ -155,16 +174,29 @@ namespace TestApp
                         continue;
                     }
                     
-                    RepackAFS_File(meta.originalFilename, meta.unpackedFilename);
-                    ReinjectInAFS(archive, meta.originalFilename);
+                    meta.recompressed = RepackAFS_File(meta.originalFilename, meta.unpackedFilename);
+                    if (!meta.recompressed)
+                    {
+                        Log($"Failed to recompressed {meta.originalFilename}! Did crappack fail?");
+                        continue;
+                    }
 
-                    meta.recompressed = true; 
+                    meta.reinjected = ReinjectInAFS(archive, meta.originalFilename);
+                    if (!meta.reinjected)
+                    {
+                        Log($"Failed to reinject {meta.originalFilename}");
+                        continue; 
+                    }
                 }
 
+                Log("Cloning previous AFS.");
                 CloneOldAFS(inputDataFile); // for reference (note: unless deleted it will get put into the ISO) 
+
+                Log("Rebuilding fresh AFS.");
                 RebuildAFS(archive, inputDataFile); // rebuilds from scratch, using the modified instance 
             }
-            
+
+            Log("Rebuilding fresh ISO.");
             RepackISO(tempFolder, outputFile, volumeLabel); 
         }
         
@@ -320,7 +352,7 @@ namespace TestApp
             }
         }
         
-        private void ReinjectInAFS(AFS afs, string input_file)
+        private bool ReinjectInAFS(AFS afs, string input_file)
         {
             var shortFilename = input_file;
             while (shortFilename.IndexOf('/') >= 0)
@@ -344,6 +376,11 @@ namespace TestApp
                 }
             }
 
+            if(directory_index == -1)
+            {
+                return false; 
+            }
+
             // read in file to the block at directory_index
             using (var reader = File.OpenRead(input_file))
             {
@@ -358,7 +395,8 @@ namespace TestApp
                 var directory_entry = afs.directory[directory_index];
                 directory_entry.fileLength = (uint)afs_file.data.Length;
             }
-            
+
+            return true; 
         }
 
         private void CloneOldAFS(string input)
@@ -389,7 +427,7 @@ namespace TestApp
         private bool UnpackAFS_File(string input)
         {
             var command = $"crappack-cmd.py -u {input}";
-            Log($"Decompressing {input}");
+            //Log($"Decompressing {input}");
 
             System.Diagnostics.Process process = new System.Diagnostics.Process();
             System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
@@ -410,7 +448,7 @@ namespace TestApp
             var unpacked = inputUnpacked;
 
             var command = $"crappack-cmd.py -p {unpacked} -o {original}";
-            Log($"Recompressing {inputPacked}");
+            //Log($"Recompressing {inputPacked}");
             
             System.Diagnostics.Process process = new System.Diagnostics.Process();
             System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
@@ -590,7 +628,10 @@ namespace TestApp
                 
             }
 
-            Log($"Updated {replaced_count} strings in \"{file}\"!");
+            if(replaced_count > 0)
+            {
+                Log($"Updated {replaced_count} strings in \"{file}\"!");
+            }
 
             return found; 
         }
@@ -681,6 +722,7 @@ namespace TestApp
             var inputFile = SelectISOText.Text;
             var outputPath = OutputFileText.Text;
             var patchData = PatchFileData.Text;
+            var archiveData = ArchiveListTextBox.Text;
 
             // todo 
             // skip first line, its the header info 
@@ -695,12 +737,11 @@ namespace TestApp
 
             var thread = new System.Threading.Thread(() =>
             {
-                Log("Starting..");
+                Log("STARTING! Go grab some coffee.");
 
-                DoApplyPatchISO(inputFile, outputPath, patchData);
-
-
-                Log("Finished.");
+                DoApplyPatchISO(inputFile, outputPath, patchData, archiveData);
+                
+                Log("FINISHED! Was it worth the wait?");
 
                 // run on main thread 
                 this.Invoke(new Action(() =>
