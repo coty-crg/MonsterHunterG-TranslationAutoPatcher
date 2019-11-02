@@ -89,10 +89,19 @@ namespace TestApp
                     var targetFilenameFull = string.Format("{0}/{1}", outputDataFolder, unpackFile);
                     var targetFilenameUnpackedFull = $"{targetFilenameFull}.unpacked";
 
-                    UnpackAFS_File(targetFilenameFull);
-                    PatchFile(targetFilenameUnpackedFull, patches);
-                    RepackAFS_File(targetFilenameFull, targetFilenameUnpackedFull);
-                    ReinjectInAFS(archive, targetFilenameFull);
+                    var unpacked = UnpackAFS_File(targetFilenameFull);
+                    if (!unpacked)
+                    {
+                        Log($"Failed to uncompress {targetFilenameFull}! Did crappack fail?");
+                        continue;
+                    }
+
+                    var patched = PatchFile(targetFilenameUnpackedFull, patches);
+                    if (patched)
+                    {
+                        RepackAFS_File(targetFilenameFull, targetFilenameUnpackedFull);
+                        ReinjectInAFS(archive, targetFilenameFull);
+                    }
                 }
 
                 CloneOldAFS(inputDataFile); // for reference (note: unless deleted it will get put into the ISO) 
@@ -320,10 +329,10 @@ namespace TestApp
         }
 
         // returns output filename 
-        private void UnpackAFS_File(string input)
+        private bool UnpackAFS_File(string input)
         {
             var command = $"crappack-cmd.py -u {input}";
-            Log("python.exe " + command);
+            Log($"Decompressing {input}");
 
             System.Diagnostics.Process process = new System.Diagnostics.Process();
             System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
@@ -333,15 +342,18 @@ namespace TestApp
             process.StartInfo = startInfo;
             process.Start();
             process.WaitForExit();
+
+            var exitCode = process.ExitCode;
+            return exitCode == 0;
         }
 
-        private void RepackAFS_File(string inputPacked, string inputUnpacked)
+        private bool RepackAFS_File(string inputPacked, string inputUnpacked)
         {
             var original = inputPacked;
             var unpacked = inputUnpacked;
 
             var command = $"crappack-cmd.py -p {unpacked} -o {original}";
-            Log("python.exe " + command);
+            Log($"Recompressing {inputPacked}");
             
             System.Diagnostics.Process process = new System.Diagnostics.Process();
             System.Diagnostics.ProcessStartInfo startInfo = new System.Diagnostics.ProcessStartInfo();
@@ -351,6 +363,9 @@ namespace TestApp
             process.StartInfo = startInfo;
             process.Start();
             process.WaitForExit();
+
+            var exitCode = process.ExitCode;
+            return exitCode == 0; 
         }
 
         private string[] GetPatches(string patchData)
@@ -410,7 +425,13 @@ namespace TestApp
 
             byte[] buffer = null;
             var replaced_count = 0;
-            
+
+            if (!File.Exists(file))
+            {
+                Log($"Couldn't find {file}. Did crappack fail to pack?");
+                return false; 
+            }
+
             using (var reader = File.OpenRead(file))
             {
                 var totalBytes = reader.Length;
