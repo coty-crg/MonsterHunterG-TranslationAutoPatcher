@@ -240,33 +240,33 @@ namespace TestApp
                 }
 
                 Log("Recompressing patched files. This may take awhile.");
-                // for (var i = 0; i < unpackFiles.Count; ++i)
-                // {
-                //     UpdateProress(cur_progress, 0, max_progress);
-                //     cur_progress += 1;
-                // 
-                //     var unpackFile = unpackFiles[i];
-                //     var meta = metadata[i];
-                // 
-                //     if (!meta.uncompressed || !meta.patched)
-                //     {
-                //         continue;
-                //     }
-                //     
-                //     meta.recompressed = RepackAFS_File(meta.originalFilename, meta.unpackedFilename);
-                //     if (!meta.recompressed)
-                //     {
-                //         Log($"Failed to recompressed {meta.originalFilename}! Did crappack fail?");
-                //         continue;
-                //     }
-                // 
-                //     meta.reinjected = ReinjectInAFS(archive, meta.originalFilename);
-                //     if (!meta.reinjected)
-                //     {
-                //         Log($"Failed to reinject {meta.originalFilename}");
-                //         continue; 
-                //     }
-                // }
+                for (var i = 0; i < unpackFiles.Count; ++i)
+                {
+                    UpdateProress(cur_progress, 0, max_progress);
+                    cur_progress += 1;
+                
+                    var unpackFile = unpackFiles[i];
+                    var meta = metadata[i];
+                
+                    if (!meta.uncompressed || !meta.patched)
+                    {
+                        continue;
+                    }
+                    
+                    meta.recompressed = RepackAFS_File(meta.originalFilename, meta.unpackedFilename);
+                    if (!meta.recompressed)
+                    {
+                        Log($"Failed to recompressed {meta.originalFilename}! Did crappack fail?");
+                        continue;
+                    }
+                
+                    meta.reinjected = ReinjectInAFS(archive, meta.originalFilename);
+                    if (!meta.reinjected)
+                    {
+                        Log($"Failed to reinject {meta.originalFilename}");
+                        continue; 
+                    }
+                }
 
                 // possibly keep for reference 
                 // note: unless deleted it will get put into the ISO
