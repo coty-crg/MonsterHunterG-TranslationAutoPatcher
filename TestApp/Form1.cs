@@ -44,6 +44,7 @@ namespace TestApp
             SelectPatchFileButton.Enabled = enable;
             CleanupCheckbox.Enabled = enable; 
             KeepOldArchivesCheckBox.Enabled = enable;
+            DeepSearchCheckbox.Enabled = enable;
         }
         
         private class TempFileMetadata
@@ -61,14 +62,17 @@ namespace TestApp
         {
             var patchingFiles = new Dictionary<string, List<string>>();
 
-            // previously passed in archives manually 
-            // var archives = archiveData.Split(',');
-            // foreach (var archive in archives)
+            // var deepSearch = DeepSearchCheckbox.Checked;
+            // if (deepSearch)
             // {
-            //     var fileList = new List<string>();
-            //     fileList.Add("sub_main.bin");
+            //     var archives = archiveData.Split(',');
+            //     foreach (var archive in archives)
+            //     {
+            //         var fileList = new List<string>();
+            //         fileList.Add("sub_main.bin");
             // 
-            //     patchingFiles.Add(archive, fileList);
+            //         patchingFiles.Add(archive, fileList);
+            //     }
             // }
 
             for (var i = 0; i < patches.Length; ++i)
@@ -140,6 +144,7 @@ namespace TestApp
 
             var tempFolder = "./temp";
             var tempFolderAFS = "./tempAFS";
+            var deepSearch = DeepSearchCheckbox.Checked;
 
             // cleanup previous work 
             RecursivelyDeleteDirectory(tempFolder);
@@ -181,7 +186,9 @@ namespace TestApp
                     for(var e = 0; e < unpackExtensions.Count; ++e)
                     {
                         var extension = unpackExtensions[e];
-                        if (dir_entry.filename.Contains(extension)) // not exactly strict
+
+                        // not exactly strict
+                        if (deepSearch || dir_entry.filename.Contains(extension)) 
                         {
                             unpackFiles.Add(dir_entry.filename);
                             break;
@@ -656,13 +663,14 @@ namespace TestApp
                     {
                         continue; 
                     }
-                    
+
+                    // 🔪 live on the edge 🔪
                     // don't do anything dangerous 
-                    if(original.Length <= 3)
-                    {
-                        continue; 
-                    }
-                    
+                    // if(original.Length <= 3)
+                    // {
+                    //     continue; 
+                    // }
+
                     // enforce the translation to equal the number of bytes we're patching 
                     var encoding = Encoding.GetEncoding("shift_jis");
                     var searchTerm = encoding.GetBytes(original);

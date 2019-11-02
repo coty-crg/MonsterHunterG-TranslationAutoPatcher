@@ -48,6 +48,7 @@
             this.CleanupCheckbox = new System.Windows.Forms.CheckBox();
             this.label3 = new System.Windows.Forms.Label();
             this.KeepOldArchivesCheckBox = new System.Windows.Forms.CheckBox();
+            this.DeepSearchCheckbox = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // SelectFolderButton
@@ -217,11 +218,22 @@
             this.KeepOldArchivesCheckBox.Text = "Keep old archives";
             this.KeepOldArchivesCheckBox.UseVisualStyleBackColor = true;
             // 
+            // DeepSearchCheckbox
+            // 
+            this.DeepSearchCheckbox.AutoSize = true;
+            this.DeepSearchCheckbox.Location = new System.Drawing.Point(216, 266);
+            this.DeepSearchCheckbox.Name = "DeepSearchCheckbox";
+            this.DeepSearchCheckbox.Size = new System.Drawing.Size(89, 17);
+            this.DeepSearchCheckbox.TabIndex = 19;
+            this.DeepSearchCheckbox.Text = "Deep Search";
+            this.DeepSearchCheckbox.UseVisualStyleBackColor = true;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(324, 521);
+            this.Controls.Add(this.DeepSearchCheckbox);
             this.Controls.Add(this.KeepOldArchivesCheckBox);
             this.Controls.Add(this.label3);
             this.Controls.Add(this.CleanupCheckbox);
@@ -272,6 +284,7 @@
         private System.Windows.Forms.CheckBox CleanupCheckbox;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.CheckBox KeepOldArchivesCheckBox;
+        private System.Windows.Forms.CheckBox DeepSearchCheckbox;
     }
 }
 

@@ -35,6 +35,9 @@ I had to figure out the AFS format. Here's what I discovered..
       - Data length (4 bytes, uint32)
     - Directory's offset (4 bytes, uint32)
     - Directory's length (4 bytes, uint32)
+
+*NOTE: The whole table of contents is inside a 512 KB buffer, with the last 8 bytes being the directory offset and length. Everything in between needs to be padded out. *
+
   - Data (this is another list, size equaling the numer of files above, containing the files themselves)
     - Note: The data is padded to the nearest 2048th byte with 0s PER FILE.
   - File Directory (this is another list, size equaling the number of files above. After the last file, it is also padded to the nearest 2048th byte AT THE END OF THE WHOLE DIRECTORY)
