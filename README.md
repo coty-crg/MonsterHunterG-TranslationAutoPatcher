@@ -1,6 +1,9 @@
 ﻿# What is this?!
 This is a language patcher for Monter Hunter G (PS2)! The tool dumps the ISO to disk, unpacks the archive files, decompresses those files, patches them, recompresses those files, repacks the archive files, then rebuilds a bootable ISO! 
 
+## Download
+  - https://github.com/coty-crg/MonsterHunterG-TranslationAutoPatcher/releases
+  
 ### Run Requirements: 
   - Python: https://www.python.org/downloads/release/python-2717/ - when installing, check on "Add to PATH" at the bottom!
   - Imgburn: http://download.imgburn.com/SetupImgBurn_2.5.8.0.exe 
