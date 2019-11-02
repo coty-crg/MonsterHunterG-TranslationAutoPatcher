@@ -54,18 +54,36 @@ namespace TestApp
 
             // which archive files contain the bin files we care about? 
             var patchingFiles = new Dictionary<string, List<string>>();
-            patchingFiles.Add("AFS_DATA.AFS", new List<string>() { "sub_main.bin" });
+            patchingFiles.Add("AFS_DATA.AFS", new List<string>() { ".bin" });
             
             foreach(var entry in patchingFiles)
             {
                 var unpackAFS = entry.Key;
-                var unpackFiles = entry.Value;
+                var unpackExtensions = entry.Value;
 
                 var inputDataFile = string.Format("{0}/{1}", tempFolder, unpackAFS);
                 var outputDataFolder = string.Format("{0}/{1}", tempFolderAFS, unpackAFS);
 
                 var archive = ExtractFromAFS(inputDataFile, outputDataFolder);
-
+                
+                // search for any archived files with the extensions we care about 
+                var unpackFiles = new List<string>(); 
+                for(var d = 0; d < archive.directory.Length; ++d)
+                {
+                    var dir_entry = archive.directory[d];
+                    
+                    for(var e = 0; e < unpackExtensions.Count; ++e)
+                    {
+                        var extension = unpackExtensions[e];
+                        if (dir_entry.filename.Contains(extension)) // not exactly strict
+                        {
+                            unpackFiles.Add(dir_entry.filename);
+                            break;
+                        }
+                    }
+                }
+                
+                // uncompress, patch, recompress, reinject into AFS instance 
                 foreach (var unpackFile in unpackFiles)
                 {
                     var targetFilenameFull = string.Format("{0}/{1}", outputDataFolder, unpackFile);
@@ -77,8 +95,8 @@ namespace TestApp
                     ReinjectInAFS(archive, targetFilenameFull);
                 }
 
-                CloneOldAFS(inputDataFile); 
-                RebuildAFS(archive, inputDataFile);
+                CloneOldAFS(inputDataFile); // for reference (note: unless deleted it will get put into the ISO) 
+                RebuildAFS(archive, inputDataFile); // rebuilds from scratch, using the modified instance 
             }
             
             RepackISO(tempFolder, outputFile, volumeLabel); 
