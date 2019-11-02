@@ -29,6 +29,16 @@ namespace TestApp
             ApplyPatchButton.Enabled = ready; 
         }
         
+        private class TempFileMetadata
+        {
+            public string originalFilename;
+            public string unpackedFilename;
+
+            public bool uncompressed;
+            public bool patched;
+            public bool recompressed; 
+        }
+
         private void DoApplyPatchISO(string inputFile, string outputFile, string patchData)
         {
             var patches = GetPatches(patchData);
@@ -65,7 +75,8 @@ namespace TestApp
                 var outputDataFolder = string.Format("{0}/{1}", tempFolderAFS, unpackAFS);
 
                 var archive = ExtractFromAFS(inputDataFile, outputDataFolder);
-                
+
+
                 // search for any archived files with the extensions we care about 
                 var unpackFiles = new List<string>(); 
                 for(var d = 0; d < archive.directory.Length; ++d)
@@ -84,10 +95,26 @@ namespace TestApp
                 }
                 
                 // uncompress, patch, recompress, reinject into AFS instance 
-                foreach (var unpackFile in unpackFiles)
+                var metadata = new List<TempFileMetadata>();
+
+                // update progress bar 
+                var max_progress = unpackFiles.Count * 3;
+                var cur_progress = 0;
+                
+                // uncompress 
+                for(var i = 0; i < unpackFiles.Count; ++i)
                 {
+                    UpdateProress(cur_progress, 0, max_progress);
+                    cur_progress += 1;
+
+                    var unpackFile = unpackFiles[i];
                     var targetFilenameFull = string.Format("{0}/{1}", outputDataFolder, unpackFile);
                     var targetFilenameUnpackedFull = $"{targetFilenameFull}.unpacked";
+                    
+                    var meta = new TempFileMetadata();
+                    meta.originalFilename = targetFilenameFull;
+                    meta.unpackedFilename = targetFilenameUnpackedFull;
+                    metadata.Add(meta);
 
                     var unpacked = UnpackAFS_File(targetFilenameFull);
                     if (!unpacked)
@@ -95,13 +122,43 @@ namespace TestApp
                         Log($"Failed to uncompress {targetFilenameFull}! Did crappack fail?");
                         continue;
                     }
+                    
+                    meta.uncompressed = true;
+                }
 
-                    var patched = PatchFile(targetFilenameUnpackedFull, patches);
-                    if (patched)
+                for (var i = 0; i < unpackFiles.Count; ++i)
+                {
+                    UpdateProress(cur_progress, 0, max_progress);
+                    cur_progress += 1;
+
+                    var unpackFile = unpackFiles[i];
+                    var meta = metadata[i];
+
+                    if (!meta.uncompressed)
                     {
-                        RepackAFS_File(targetFilenameFull, targetFilenameUnpackedFull);
-                        ReinjectInAFS(archive, targetFilenameFull);
+                        continue;
                     }
+
+                    meta.patched = PatchFile(meta.unpackedFilename, patches);
+                }
+
+                for (var i = 0; i < unpackFiles.Count; ++i)
+                {
+                    UpdateProress(cur_progress, 0, max_progress);
+                    cur_progress += 1;
+
+                    var unpackFile = unpackFiles[i];
+                    var meta = metadata[i];
+
+                    if (!meta.uncompressed || !meta.patched)
+                    {
+                        continue;
+                    }
+                    
+                    RepackAFS_File(meta.originalFilename, meta.unpackedFilename);
+                    ReinjectInAFS(archive, meta.originalFilename);
+
+                    meta.recompressed = true; 
                 }
 
                 CloneOldAFS(inputDataFile); // for reference (note: unless deleted it will get put into the ISO) 
@@ -445,8 +502,6 @@ namespace TestApp
                 
                 for (var p = 1; p < patches.Length; ++p)
                 {
-                    UpdateProress(p, 0, patches.Length);
-
                     var patchData = patches[p];
                     var data = patchData.Split(',');
 
