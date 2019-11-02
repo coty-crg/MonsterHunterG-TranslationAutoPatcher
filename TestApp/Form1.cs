@@ -407,11 +407,10 @@ namespace TestApp
                 {
                     reader.Read(buffer, b, read_per);
                 }
-
-                //
+                
                 for (var p = 1; p < patches.Length; ++p)
                 {
-                    UpdateProress(1);
+                    UpdateProress(p, 0, patches.Length);
 
                     var patchData = patches[p];
                     var data = patchData.Split(',');
@@ -430,31 +429,33 @@ namespace TestApp
                     }
                     
                     // enforce the translation to equal the number of bytes we're patching 
-                    var encoding = Encoding.GetEncoding("shift_jis"); // "shift_jis"
+                    var encoding = Encoding.GetEncoding("shift_jis");
                     var searchTerm = encoding.GetBytes(original);
                     var patch = encoding.GetBytes(translation);
                     var spaces = encoding.GetBytes(" ");
 
-                    if (searchTerm.Length != patch.Length)
+                    var chunk_size = 8;
+                    var original_padding = chunk_size - searchTerm.Length % chunk_size;
+                    var original_full_length = searchTerm.Length + original_padding; 
+
+                    if (original_full_length != patch.Length)
                     {
-                        var cutTranslation = new byte[searchTerm.Length];
+                        var paddedTranslation = new byte[searchTerm.Length];
                         for (var b = 0; b < searchTerm.Length; ++b)
                         {
                             if (b >= patch.Length)
                             {
-                                cutTranslation[b] = spaces[0];
+                                paddedTranslation[b] = spaces[0];
                             }
                             else
                             {
-                                cutTranslation[b] = patch[b];
+                                paddedTranslation[b] = patch[b];
                             }
                         }
-                        patch = cutTranslation;
+
+                        patch = paddedTranslation;
                     }
-
-                    // var success = FindAndPatch(inputFolder, originalBytes, translationBytes);
-
-                    var found_any = false; 
+                    
                     for (var b = 0; b < buffer.Length - searchTerm.Length; ++b)
                     {
                         var match = true;
@@ -477,19 +478,10 @@ namespace TestApp
                         {
                             buffer[b + r] = patch[r];
                         }
-
+                        
                         replaced_count += 1;
-                        found_any = true; 
-                    }
-
-                    if (found_any)
-                    {
-                        // Log($"Replaced {original} with {translation}"); 
                     }
                 }
-                //
-
-
 
                 found = replaced_count > 0;
             }
@@ -505,18 +497,10 @@ namespace TestApp
                         writer.Write(buffer, b, write_per);
                     }
                 }
+                
+            }
 
-                // var encoding = Encoding.GetEncoding("shift_jis");
-                // var searchTermString = encoding.GetString(searchTerm);
-                // var patchString = encoding.GetString(patch);
-                // var log = string.Format($"Replaced \"{searchTermString}\" with \"{patchString}\" at \"{file}\", ({replaced_count} instances)");
-                // Log(log);
-                Log($"success! ({replaced_count} instances) at \"{file}\"");
-            }
-            else
-            {
-                Log($"skipping \"{file}\"");
-            }
+            Log($"Updated {replaced_count} strings in \"{file}\"!");
 
             return found; 
         }
@@ -533,15 +517,20 @@ namespace TestApp
             System.Diagnostics.Debug.WriteLine(value); 
         }
 
-        public void UpdateProress(int addProgress)
+
+
+        public void UpdateProress(int progress, int min, int max)
         {
             if (InvokeRequired)
             {
-                this.Invoke(new Action<int>(UpdateProress), new object[] { addProgress });
+                this.Invoke(new Action<int, int, int>(UpdateProress), new object[] { progress, min, max });
                 return;
             }
 
-            PatchProgressBar.Value += addProgress;
+            progress = Math.Max(Math.Min(progress, max), min);
+            PatchProgressBar.Minimum = min;
+            PatchProgressBar.Maximum = max; 
+            PatchProgressBar.Value = progress;
         }
 
         // events 
