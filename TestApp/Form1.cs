@@ -89,11 +89,7 @@ namespace TestApp
             using (FileStream isoStream = File.Open(inputFile, FileMode.Open))
             {
                 var reader_cd = new CDReader(isoStream, true, true);
-
                 volumeLabel = reader_cd.VolumeLabel;
-                // bootLoadSegment = reader_cd.BootLoadSegment;
-                // bootImageStream = null;
-
                 ExtractISO_Directory(reader_cd, outputFolder, reader_cd.Root.FullName);
             }
         }
@@ -516,9 +512,7 @@ namespace TestApp
             OutputText.Text = string.Format("{0}\r\n{1}", value, OutputText.Text);
             System.Diagnostics.Debug.WriteLine(value); 
         }
-
-
-
+        
         public void UpdateProress(int progress, int min, int max)
         {
             if (InvokeRequired)
