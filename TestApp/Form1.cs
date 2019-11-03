@@ -666,10 +666,10 @@ namespace TestApp
 
                     // 🔪 live on the edge 🔪
                     // don't do anything dangerous 
-                    // if(original.Length <= 3)
-                    // {
-                    //     continue; 
-                    // }
+                    if(original.Length < 2)
+                    {
+                        continue; 
+                    }
 
                     // enforce the translation to equal the number of bytes we're patching 
                     var encoding = Encoding.GetEncoding("shift_jis");
