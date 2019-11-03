@@ -62,7 +62,26 @@ namespace TestApp
             stream.WriteByte( (byte) (data >> 00) );
             stream.WriteByte( (byte) (data >> 08) );
         }
-        
+
+        public static ushort ReadUInt16(byte[] buffer)
+        {
+            ushort result = 0;
+
+            var b0 = buffer[0];
+            var b1 = buffer[1];
+
+            result += (ushort)(b1 << 08);
+            result += (ushort)(b0 << 00);
+
+            return result;
+        }
+
+        public static void WriteUInt16(byte[] buffer, ushort data)
+        {
+            buffer[0] = (byte)(data >> 00);
+            buffer[1] = (byte)(data >> 08);
+        }
+
         public static uint ReadUInt32(FileStream stream)
         {
             uint result = 0;
@@ -86,6 +105,31 @@ namespace TestApp
             stream.WriteByte((byte)(data >> 08));
             stream.WriteByte((byte)(data >> 16));
             stream.WriteByte((byte)(data >> 24));
+        }
+
+        public static uint ReadUInt32(byte[] buffer)
+        {
+            uint result = 0;
+
+            var b0 = buffer[0];
+            var b1 = buffer[1];
+            var b2 = buffer[2];
+            var b3 = buffer[3];
+
+            result += ((uint)b3 << 24);
+            result += ((uint)b2 << 16);
+            result += ((uint)b1 << 08);
+            result += ((uint)b0 << 00);
+
+            return result;
+        }
+
+        public static void WriteUInt32(byte[] buffer, uint data)
+        {
+            buffer[0] = (byte)(data >> 00);
+            buffer[1] = (byte)(data >> 08);
+            buffer[2] = (byte)(data >> 16);
+            buffer[3] = (byte)(data >> 24);
         }
 
         public static void WritePadding(FileStream stream, long length)

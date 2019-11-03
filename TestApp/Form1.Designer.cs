@@ -49,6 +49,7 @@
             this.label3 = new System.Windows.Forms.Label();
             this.KeepOldArchivesCheckBox = new System.Windows.Forms.CheckBox();
             this.DeepSearchCheckbox = new System.Windows.Forms.CheckBox();
+            this.OutputPointersCheckbox = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // SelectFolderButton
@@ -228,11 +229,22 @@
             this.DeepSearchCheckbox.Text = "Deep Search";
             this.DeepSearchCheckbox.UseVisualStyleBackColor = true;
             // 
+            // OutputPointersCheckbox
+            // 
+            this.OutputPointersCheckbox.AutoSize = true;
+            this.OutputPointersCheckbox.Location = new System.Drawing.Point(216, 290);
+            this.OutputPointersCheckbox.Name = "OutputPointersCheckbox";
+            this.OutputPointersCheckbox.Size = new System.Drawing.Size(99, 17);
+            this.OutputPointersCheckbox.TabIndex = 20;
+            this.OutputPointersCheckbox.Text = "Output Pointers";
+            this.OutputPointersCheckbox.UseVisualStyleBackColor = true;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(324, 521);
+            this.Controls.Add(this.OutputPointersCheckbox);
             this.Controls.Add(this.DeepSearchCheckbox);
             this.Controls.Add(this.KeepOldArchivesCheckBox);
             this.Controls.Add(this.label3);
@@ -285,6 +297,7 @@
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.CheckBox KeepOldArchivesCheckBox;
         private System.Windows.Forms.CheckBox DeepSearchCheckbox;
+        private System.Windows.Forms.CheckBox OutputPointersCheckbox;
     }
 }
 

@@ -45,6 +45,7 @@ namespace TestApp
             CleanupCheckbox.Enabled = enable; 
             KeepOldArchivesCheckBox.Enabled = enable;
             DeepSearchCheckbox.Enabled = enable;
+            OutputPointersCheckbox.Enabled = enable;
         }
         
         private class TempFileMetadata
@@ -622,6 +623,39 @@ namespace TestApp
             return found;
         }
 
+        private uint findPointerPosition(byte[] buffer, uint position)
+        {
+            var pointerBuffer = new byte[4]; // are the pointers 4 bytes?
+            BinaryHelper.WriteUInt32(pointerBuffer,  position);
+
+            // assuming the pointer is behind the actual string
+            for (var b = 0; b < buffer.Length - pointerBuffer.Length; ++b)
+            {
+                var match = true;
+                for (var r = 0; r < pointerBuffer.Length; ++r)
+                {
+                    if (buffer[b + r] != pointerBuffer[r])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match)
+                {
+                    return (uint) b; 
+                }
+            }
+
+            return 0; 
+        }
+
+        private struct PatchPointerPair
+        {
+            public uint referencedAtPosition;
+            public uint pointer; 
+        }
+
         private bool PatchFile(string file, string[] patches)
         {
             var found = false;
@@ -634,6 +668,8 @@ namespace TestApp
                 Log($"Couldn't find {file}. Did crappack fail to pack?");
                 return false; 
             }
+
+            var pointers = new Dictionary<string, PatchPointerPair>();
 
             using (var reader = File.OpenRead(file))
             {
@@ -658,6 +694,7 @@ namespace TestApp
 
                     var original = data[0];
                     var translation = data[2];
+                    var groupOffset = data[6]; 
 
                     if(string.IsNullOrEmpty(original) || string.IsNullOrEmpty(translation))
                     {
@@ -681,6 +718,7 @@ namespace TestApp
                     var original_padding = chunk_size - searchTerm.Length % chunk_size;
                     var original_full_length = searchTerm.Length + original_padding; 
 
+                    // resize
                     if (original_full_length != patch.Length)
                     {
                         var paddedTranslation = new byte[searchTerm.Length];
@@ -699,6 +737,7 @@ namespace TestApp
                         patch = paddedTranslation;
                     }
                     
+                    // find match 
                     for (var b = 0; b < buffer.Length - searchTerm.Length; ++b)
                     {
                         var match = true;
@@ -716,6 +755,20 @@ namespace TestApp
                             continue;
                         }
 
+                        // match found, note the position and try to find it's pointer?!
+                        var pointerPosition = findPointerPosition(buffer, (uint) b); 
+                        if(pointerPosition > 0)
+                        {
+                            // 💦
+                            if (!pointers.ContainsKey(original))
+                            {
+                                pointers.Add(original, new PatchPointerPair() {
+                                    referencedAtPosition = pointerPosition,
+                                    pointer = (uint) b
+                                }); 
+                            }
+                        }
+
                         // match found, replace!
                         for (var r = 0; r < searchTerm.Length; ++r)
                         {
@@ -725,7 +778,7 @@ namespace TestApp
                         replaced_count += 1;
                     }
                 }
-
+                
                 found = replaced_count > 0;
             }
 
@@ -743,7 +796,25 @@ namespace TestApp
                 
             }
 
-            if(replaced_count > 0)
+            if (OutputPointersCheckbox.Checked)
+            {
+                var sb = new StringBuilder();
+                foreach (var pointer in pointers)
+                {
+                    var pointerPair = pointer.Value;
+                    var referenceHex = pointerPair.referencedAtPosition.ToString("X8");
+                    var pointerHex = pointerPair.pointer.ToString("X8");
+
+                    sb.AppendLine($"{pointer.Key} => pointer: 0x{pointerHex} referenced at 0x{referenceHex}"); 
+                }
+
+                if(pointers.Count > 0)
+                {
+                    Log($"Pointers found: \n\r{sb.ToString()}");
+                }
+            }
+
+            if (replaced_count > 0)
             {
                 Log($"Updated {replaced_count} strings in \"{file}\"!");
             }
