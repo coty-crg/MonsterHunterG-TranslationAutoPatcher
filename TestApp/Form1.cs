@@ -14,8 +14,26 @@ namespace TestApp
         public Form1()
         {
             InitializeComponent();
+
+            Application.ThreadException += new System.Threading.ThreadExceptionEventHandler(Application_ThreadException);
         }
-        
+
+        //all the exception will be catched and handled in this delegated method.
+        private static void Application_ThreadException(object sender, System.Threading.ThreadExceptionEventArgs e)
+        {
+            //log you error
+
+            var sb = new StringBuilder();
+            sb.AppendLine(e.Exception.Message);
+            sb.AppendLine(e.Exception.StackTrace);
+            var error = sb.ToString();
+
+            MessageBox.Show(error);
+            Console.WriteLine(error);
+
+            File.WriteAllText("error.txt", error);
+        }
+
         private void TryEnableApplyButton()
         {
             var input = SelectISOText.Text; 
@@ -329,7 +347,7 @@ namespace TestApp
             {
                 var fileStream = cd.OpenFile(cd_file, FileMode.Open);
                 var real_file = string.Format("{0}/{1}", outputFolder, cd_file);
-                // Log($"extracting {cd_file} to {real_file}");
+                Log($"extracting {cd_file} to {real_file}");
 
                 using (var writerStream = File.OpenWrite(real_file))
                 {
@@ -821,7 +839,7 @@ namespace TestApp
 
             return found; 
         }
-
+        
         public void Log(string value)
         {
             if (InvokeRequired)
@@ -919,11 +937,21 @@ namespace TestApp
 
             var thread = new System.Threading.Thread(() =>
             {
-                Log("STARTING! Go grab some coffee.");
+                try
+                {
+                    Log("STARTING! Go grab some coffee.");
 
-                DoApplyPatchISO(inputFile, outputPath, patchData);
+                    DoApplyPatchISO(inputFile, outputPath, patchData);
                 
-                Log("FINISHED! Was it worth the wait?");
+                    Log("FINISHED! Was it worth the wait?");
+                }
+                catch(Exception error)
+                {
+                    Log(error.StackTrace);
+                    Log(error.Message);
+
+                    Log("ERROR! Failed to patch.");
+                }
 
                 // run on main thread 
                 this.Invoke(new Action(() =>
