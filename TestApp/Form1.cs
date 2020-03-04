@@ -97,6 +97,13 @@ namespace TestApp
             for (var i = 0; i < patches.Length; ++i)
             {
                 var patch = patches[i].Split(',');
+
+                // ignore any lines without enough info 
+                if(patch == null || patch.Length < 5)
+                {
+                    continue; 
+                }
+
                 var patchArchive = patch[4];
                 var patchFile = patch[5];
                 
@@ -459,6 +466,7 @@ namespace TestApp
                     var file = archive.files[i];
 
                     var fullFilename = string.Format("{0}/{1}", output, directory_entry.filename);
+                    // Log($"Extracting \"{fullFilename}\" from archive.");
 
                     using (var writer = File.OpenWrite(fullFilename))
                     {
@@ -839,7 +847,30 @@ namespace TestApp
 
             return found; 
         }
+
+
+        private struct RepointerPatch
+        {
+            public byte[] OldString;
+            public byte[] NewString;
         
+            public uint GroupStartOffset;
+            public uint GroupRelativeOffset;
+        
+        }
+
+        private class PatchGroupPointers
+        {
+
+
+
+        }
+
+        private void PatchFileWithRepointer(string file, string[] patches)
+        {
+
+        }
+
         public void Log(string value)
         {
             if (InvokeRequired)
